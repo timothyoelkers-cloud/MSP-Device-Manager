@@ -6,7 +6,7 @@ const Auth = {
   // App Registration config — REPLACE with your own App Registration
   msalConfig: {
     auth: {
-      clientId: 'YOUR-CLIENT-ID-HERE', // Register at https://entra.microsoft.com
+      clientId: '7a20ef88-2e8f-4ea1-8ed0-79df7ae259b8',
       authority: 'https://login.microsoftonline.com/common',
       redirectUri: window.location.origin + window.location.pathname,
       postLogoutRedirectUri: window.location.origin + window.location.pathname,
