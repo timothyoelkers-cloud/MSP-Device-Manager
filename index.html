@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MSP Device Manager — Microsoft 365 Multi-Tenant Device Management for Managed Service Providers">
+  <meta name="author" content="Timothy Oelkers">
+  <title>MSP Device Manager — M365 Multi-Tenant Device Management</title>
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232563eb'/%3E%3Cpath d='M30 35h40v8H30zm0 14h40v8H30zm0 14h25v8H30z' fill='white'/%3E%3C/svg%3E">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/design-system.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+
+  <!-- MSAL.js for Azure AD Authentication -->
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+</head>
+<body>
+
+  <!-- ============================================================
+       ACCESS GATE — Password protection during review
+       ============================================================ -->
+  <div id="accessGate" class="gate-overlay">
+    <div class="gate-card">
+      <div class="gate-logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <h1 class="gate-title">MSP Device Manager</h1>
+      <p class="gate-subtitle">Multi-tenant M365 device management for Managed Service Providers. Enter your access code to continue.</p>
+      <div class="gate-input-wrapper">
+        <input type="password" id="gateCode" class="gate-input" placeholder="Enter access code" autocomplete="off" autofocus>
+      </div>
+      <button id="gateBtn" class="gate-btn" onclick="validateGate()">Unlock</button>
+      <p id="gateError" class="gate-error">Invalid access code. Please try again.</p>
+      <div class="gate-footer">
+        <p>Need access? <a href="mailto:timothy.oelkers@outlook.com?subject=MSP Device Manager Access Request">Request Access</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       APP SHELL
+       ============================================================ -->
+  <div id="app" class="app-shell hidden">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <button class="topbar-menu-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
+      <a href="#/" class="topbar-logo">
+        <div class="topbar-logo-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <span class="topbar-logo-text">MSP <span>Device Manager</span></span>
+      </a>
+      <span class="topbar-version">v1.0 Preview</span>
+
+      <div class="topbar-spacer"></div>
+
+      <div class="topbar-actions">
+        <!-- Tenant Selector -->
+        <div class="topbar-tenant-selector" id="tenantSelectorBtn" onclick="Tenants.showSelector()">
+          <span class="tenant-dot"></span>
+          <span class="tenant-name" id="activeTenantName">All Tenants</span>
+          <span class="tenant-arrow">&#9662;</span>
+        </div>
+
+        <!-- Notifications -->
+        <button class="topbar-btn" data-tooltip="Notifications" onclick="toggleNotifications()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span class="badge-dot" id="notifDot" style="display:none"></span>
+        </button>
+
+        <!-- Settings -->
+        <button class="topbar-btn" data-tooltip="Settings" onclick="Router.navigate('settings')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+
+        <!-- Auth Button / Avatar -->
+        <div id="authArea">
+          <button class="btn btn-primary btn-sm" id="connectBtn" onclick="Auth.login()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Connect Tenant
+          </button>
+          <div id="userAvatar" class="topbar-avatar hidden" onclick="Auth.showMenu()">TO</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Overview</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link active" data-page="dashboard" onclick="Router.navigate('dashboard')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              </span>
+              Dashboard
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="tenants" onclick="Router.navigate('tenants')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              </span>
+              Tenants
+              <span class="sidebar-nav-badge" id="tenantCount">0</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Device Management</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="devices" onclick="Router.navigate('devices')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </span>
+              All Devices
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="compliance" onclick="Router.navigate('compliance')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
+              Compliance
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="configurations" onclick="Router.navigate('configurations')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+              </span>
+              Configuration Profiles
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="security" onclick="Router.navigate('security')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              </span>
+              Endpoint Security
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Deployment</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="apps" onclick="Router.navigate('apps')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h6"/></svg>
+              </span>
+              Applications
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="autopilot" onclick="Router.navigate('autopilot')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </span>
+              Autopilot
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="updates" onclick="Router.navigate('updates')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+              </span>
+              Windows Updates
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="groups" onclick="Router.navigate('groups')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+              </span>
+              Groups
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Tenant Filter</div>
+        <div class="sidebar-tenant-filter">
+          <select class="sidebar-tenant-select" id="sidebarTenantFilter" onchange="AppState.setActiveTenant(this.value)">
+            <option value="all">All Tenants</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer - Sponsor -->
+      <div class="sidebar-footer">
+        <div class="sidebar-sponsor">
+          <div class="sidebar-sponsor-title">Support This Project</div>
+          <div class="sidebar-sponsor-text">Help us keep MSP Device Manager free and open source.</div>
+          <a class="sidebar-sponsor-btn" href="https://github.com/sponsors/timothyoelkers-cloud" target="_blank">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            Become a Sponsor
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content" id="mainContent">
+      <!-- Pages are rendered here dynamically -->
+    </main>
+
+    <!-- Device Detail Slide-Over Panel -->
+    <div class="detail-panel" id="deviceDetailPanel">
+      <div class="detail-panel-header">
+        <h3 id="detailDeviceName">Device Name</h3>
+        <button class="modal-close" onclick="Devices.closeDetail()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="detail-panel-body" id="detailPanelBody">
+        <!-- Populated dynamically -->
+      </div>
+      <div class="detail-actions" id="detailPanelActions">
+        <!-- Action buttons populated dynamically -->
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+  </div><!-- /app -->
+
+  <!-- ============================================================
+       MODALS
+       ============================================================ -->
+
+  <!-- Tenant Selector Modal -->
+  <div class="modal-overlay hidden" id="tenantSelectorModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Select Tenant</h3>
+          <p class="card-header-subtitle">Choose a tenant to filter or select "All Tenants"</p>
+        </div>
+        <button class="modal-close" onclick="Tenants.hideSelector()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="tenantSelectorBody">
+        <!-- Tenant list populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Connect Tenant Modal -->
+  <div class="modal-overlay hidden" id="connectTenantModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Connect Tenant</h3>
+        <button class="modal-close" onclick="document.getElementById('connectTenantModal').classList.add('hidden')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="flex flex-col gap-4">
+          <button class="btn btn-primary btn-lg w-full" onclick="Auth.login()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Sign in with Microsoft (Single Tenant)
+          </button>
+          <div class="text-center text-muted text-sm">or</div>
+          <button class="btn btn-secondary btn-lg w-full" onclick="Auth.loginPartnerCenter()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Connect via Partner Center (GDAP - All Tenants)
+          </button>
+          <p class="text-xs text-muted text-center" style="margin-top: 8px;">Partner Center connection requires CSP partner credentials with GDAP relationships configured.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- License Key Modal -->
+  <div class="modal-overlay hidden" id="licenseModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Enter License Key</h3>
+        <button class="modal-close" onclick="document.getElementById('licenseModal').classList.add('hidden')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group mb-4">
+          <label class="form-label">License Key</label>
+          <input type="text" class="form-input" id="licenseKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX" style="text-transform: uppercase; letter-spacing: 0.05em;">
+          <span class="form-hint">Enter your Pro license key to unlock unlimited tenants and premium features.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('licenseModal').classList.add('hidden')">Cancel</button>
+        <button class="btn btn-primary" onclick="Licensing.validateKey()">Activate License</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT MODULES
+       ============================================================ -->
+  <script src="js/state.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/graph.js"></script>
+  <script src="js/tenants.js"></script>
+  <script src="js/devices.js"></script>
+  <script src="js/compliance.js"></script>
+  <script src="js/configurations.js"></script>
+  <script src="js/security.js"></script>
+  <script src="js/apps.js"></script>
+  <script src="js/autopilot.js"></script>
+  <script src="js/updates.js"></script>
+  <script src="js/groups.js"></script>
+  <script src="js/licensing.js"></script>
+  <script src="js/sponsor.js"></script>
+  <script src="js/dashboard.js"></script>
+
+  <!-- Gate Script -->
+  <script>
+    function validateGate() {
+      const code = document.getElementById('gateCode').value;
+      // SHA-256 hash comparison for security
+      const validHashes = [
+        '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8' // "password" — change this
+      ];
+
+      crypto.subtle.digest('SHA-256', new TextEncoder().encode(code)).then(hash => {
+        const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        if (validHashes.includes(hex)) {
+          document.getElementById('accessGate').style.display = 'none';
+          document.getElementById('app').classList.remove('hidden');
+          sessionStorage.setItem('msp_gate_passed', '1');
+          Router.init();
+        } else {
+          document.getElementById('gateCode').classList.add('error');
+          document.getElementById('gateError').classList.add('visible');
+          setTimeout(() => {
+            document.getElementById('gateCode').classList.remove('error');
+          }, 500);
+        }
+      });
+    }
+
+    // Check if already authenticated this session
+    if (sessionStorage.getItem('msp_gate_passed') === '1') {
+      document.getElementById('accessGate').style.display = 'none';
+      document.getElementById('app').classList.remove('hidden');
+      // Router.init() called after scripts load
+    }
+
+    // Enter key support
+    document.getElementById('gateCode').addEventListener('keydown', e => {
+      if (e.key === 'Enter') validateGate();
+    });
+
+    // Toggle sidebar (mobile)
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebarOverlay').classList.toggle('visible');
+    }
+
+    function toggleNotifications() {
+      Toast.show('No new notifications', 'info');
+    }
+
+    // Initialize app after gate
+    window.addEventListener('DOMContentLoaded', () => {
+      if (sessionStorage.getItem('msp_gate_passed') === '1') {
+        Router.init();
+      }
+    });
+  </script>
+</body>
+</html>
