@@ -36,19 +36,35 @@ const Auth = {
   ],
 
   msalInstance: null,
+  msalReady: false,
 
-  init() {
+  async init() {
     try {
-      this.msalInstance = new msal.PublicClientApplication(this.msalConfig);
+      const pca = new msal.PublicClientApplication(this.msalConfig);
+      // MSAL 2.x requires async initialize()
+      if (typeof pca.initialize === 'function') {
+        await pca.initialize();
+      }
+      this.msalInstance = pca;
+      this.msalReady = true;
+      console.log('MSAL initialized successfully');
     } catch (e) {
-      console.warn('MSAL init skipped — configure clientId in auth.js');
+      console.error('MSAL init failed:', e);
+      this.msalReady = false;
     }
+  },
+
+  async ensureReady() {
+    if (!this.msalReady) {
+      await this.init();
+    }
+    return this.msalReady;
   },
 
   // Single tenant login
   async login() {
-    if (!this.msalInstance) {
-      Toast.show('Please configure your Azure App Registration clientId in js/auth.js', 'warning', 'Configuration Required');
+    if (!(await this.ensureReady())) {
+      Toast.show('MSAL authentication library failed to initialize. Check browser console for details.', 'error', 'Auth Error');
       return;
     }
     try {
@@ -108,8 +124,8 @@ const Auth = {
 
   // Partner Center login for GDAP multi-tenant
   async loginPartnerCenter() {
-    if (!this.msalInstance) {
-      Toast.show('Please configure your Azure App Registration clientId in js/auth.js', 'warning', 'Configuration Required');
+    if (!(await this.ensureReady())) {
+      Toast.show('MSAL authentication library failed to initialize. Check browser console for details.', 'error', 'Auth Error');
       return;
     }
 
@@ -208,7 +224,7 @@ const Auth = {
 
   // Acquire a delegated token for a specific tenant (GDAP)
   async acquireTokenForTenant(tenantId) {
-    if (!this.msalInstance) return null;
+    if (!(await this.ensureReady())) return null;
     try {
       const tokenRequest = {
         scopes: this.graphScopes,
@@ -332,4 +348,5 @@ const Auth = {
 };
 
 // Initialize MSAL on load
+// Initialize MSAL eagerly (async — login calls will await readiness)
 Auth.init();
