@@ -40,12 +40,17 @@ const Auth = {
 
   async init() {
     try {
-      const pca = new msal.PublicClientApplication(this.msalConfig);
-      // MSAL 2.x requires async initialize()
-      if (typeof pca.initialize === 'function') {
-        await pca.initialize();
+      // MSAL v3 requires async createPublicClientApplication
+      if (typeof msal.createPublicClientApplication === 'function') {
+        this.msalInstance = await msal.createPublicClientApplication(this.msalConfig);
+      } else {
+        // Fallback for v2
+        const pca = new msal.PublicClientApplication(this.msalConfig);
+        if (typeof pca.initialize === 'function') {
+          await pca.initialize();
+        }
+        this.msalInstance = pca;
       }
-      this.msalInstance = pca;
       this.msalReady = true;
       console.log('MSAL initialized successfully');
     } catch (e) {
