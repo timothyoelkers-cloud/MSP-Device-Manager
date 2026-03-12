@@ -416,10 +416,15 @@
 }
 
 /* --- Responsive --- */
+@media (max-width: 1280px) {
+  .grid-5 { grid-template-columns: repeat(3, 1fr); }
+}
+
 @media (max-width: 1024px) {
   .main-content {
     padding: var(--sp-4) var(--sp-5);
   }
+  .grid-5 { grid-template-columns: repeat(2, 1fr); }
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
 }
@@ -446,6 +451,7 @@
     margin-left: 0;
     padding: var(--sp-4);
   }
+  .grid-5 { grid-template-columns: 1fr; }
   .grid-4 { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }

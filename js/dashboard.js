@@ -1,8 +1,216 @@
 /* ============================================================
    Dashboard — Main dashboard with cross-tenant overview
+   Enhanced with activity timeline, health scores, quick actions,
+   stale device warnings, and richer visualizations.
    ============================================================ */
 
 const Dashboard = {
+
+  /* ---- Helpers ---- */
+
+  _relativeTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr  = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDay < 30) return `${diffDay}d ago`;
+    return `${Math.floor(diffDay / 30)}mo ago`;
+  },
+
+  _daysSince(dateStr) {
+    if (!dateStr) return Infinity;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return Infinity;
+    return (Date.now() - d.getTime()) / 86400000;
+  },
+
+  _pct(num, den) {
+    return den > 0 ? Math.round((num / den) * 100) : 0;
+  },
+
+  /* Mini sparkline SVG — 7 tiny bars representing a trend */
+  _sparkline(values, color) {
+    if (!values || values.length === 0) return '';
+    const max = Math.max(...values, 1);
+    const w = 48, h = 20, barW = 5, gap = 2;
+    const bars = values.slice(-7).map((v, i) => {
+      const bh = Math.max(2, (v / max) * h);
+      return `<rect x="${i * (barW + gap)}" y="${h - bh}" width="${barW}" height="${bh}" rx="1" fill="${color}" opacity="${0.4 + 0.6 * (i / 6)}"/>`;
+    }).join('');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">${bars}</svg>`;
+  },
+
+  /* Build a simple 7-slot distribution from dates (last 7 days bucketed) */
+  _buildTrendBuckets(devices, dateField) {
+    const buckets = [0,0,0,0,0,0,0];
+    const now = Date.now();
+    devices.forEach(d => {
+      const val = d[dateField];
+      if (!val) return;
+      const age = (now - new Date(val).getTime()) / 86400000;
+      if (age < 7) {
+        const idx = 6 - Math.min(6, Math.floor(age));
+        buckets[idx]++;
+      }
+    });
+    return buckets;
+  },
+
+  /* ---- Export CSV of all devices ---- */
+  _exportFullReport(allDevices) {
+    if (allDevices.length === 0) {
+      Toast.show('No devices to export', 'warning');
+      return;
+    }
+    const headers = ['Device Name','OS','OS Version','Compliance','Encrypted','User','Tenant','Last Sync','Enrolled','Total Storage (GB)','Free Storage (GB)'];
+    const rows = allDevices.map(d => [
+      d.deviceName || '',
+      d.operatingSystem || '',
+      d.osVersion || '',
+      d.complianceState || '',
+      d.isEncrypted ? 'Yes' : 'No',
+      d.userPrincipalName || '',
+      AppState.getTenantName(d._tenantId),
+      d.lastSyncDateTime || '',
+      d.enrolledDateTime || '',
+      d.totalStorageSpaceInBytes ? Math.round(d.totalStorageSpaceInBytes / 1073741824) : '',
+      d.freeStorageSpaceInBytes ? Math.round(d.freeStorageSpaceInBytes / 1073741824) : ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `device-report-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    Toast.show('Report exported successfully', 'success');
+  },
+
+  /* ---- Sync all devices for current context ---- */
+  async _syncAllDevices() {
+    const tenants = AppState.get('tenants');
+    const active = AppState.get('activeTenant');
+    const targets = active ? [tenants.find(t => t.id === active)].filter(Boolean) : tenants;
+    if (targets.length === 0) { Toast.show('No tenants connected', 'warning'); return; }
+    Toast.show(`Syncing devices across ${targets.length} tenant(s)...`, 'info');
+    for (const t of targets) {
+      const devices = AppState.get('devices')[t.id] || [];
+      for (const d of devices) {
+        try { await Graph.syncDevice(t.id, d.id); } catch(_) { /* best effort */ }
+      }
+    }
+    Toast.show('Sync requests sent to all devices', 'success');
+  },
+
+  /* ---- Build activity timeline events ---- */
+  _buildActivityEvents(allDevices) {
+    const now = Date.now();
+    const sevenDays = 7 * 86400000;
+    const events = [];
+
+    allDevices.forEach(d => {
+      const tenantName = AppState.getTenantName(d._tenantId);
+      // Recently enrolled
+      if (d.enrolledDateTime) {
+        const age = now - new Date(d.enrolledDateTime).getTime();
+        if (age < sevenDays && age > 0) {
+          events.push({
+            date: new Date(d.enrolledDateTime),
+            icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>`,
+            desc: `<span class="fw-500">${d.deviceName || 'Unknown'}</span> enrolled`,
+            tenant: tenantName,
+            tenantId: d._tenantId,
+            type: 'enrolled'
+          });
+        }
+      }
+      // Non-compliant
+      if (d.complianceState === 'noncompliant') {
+        const syncDate = d.lastSyncDateTime ? new Date(d.lastSyncDateTime) : new Date();
+        events.push({
+          date: syncDate,
+          icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+          desc: `<span class="fw-500">${d.deviceName || 'Unknown'}</span> non-compliant`,
+          tenant: tenantName,
+          tenantId: d._tenantId,
+          type: 'noncompliant'
+        });
+      }
+      // Low storage
+      if (d.totalStorageSpaceInBytes && d.freeStorageSpaceInBytes) {
+        const freePct = (d.freeStorageSpaceInBytes / d.totalStorageSpaceInBytes) * 100;
+        if (freePct < 10) {
+          events.push({
+            date: d.lastSyncDateTime ? new Date(d.lastSyncDateTime) : new Date(),
+            icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+            desc: `<span class="fw-500">${d.deviceName || 'Unknown'}</span> low storage (${Math.round(freePct)}% free)`,
+            tenant: tenantName,
+            tenantId: d._tenantId,
+            type: 'lowstorage'
+          });
+        }
+      }
+      // Stale
+      if (d.lastSyncDateTime) {
+        const age = now - new Date(d.lastSyncDateTime).getTime();
+        if (age > sevenDays) {
+          events.push({
+            date: new Date(d.lastSyncDateTime),
+            icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-tertiary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+            desc: `<span class="fw-500">${d.deviceName || 'Unknown'}</span> stale (${Math.floor(age / 86400000)}d since sync)`,
+            tenant: tenantName,
+            tenantId: d._tenantId,
+            type: 'stale'
+          });
+        }
+      }
+    });
+
+    events.sort((a, b) => b.date - a.date);
+    return events.slice(0, 10);
+  },
+
+  /* ---- Health score per tenant ---- */
+  _calcHealthScore(tDevices) {
+    const total = tDevices.length;
+    if (total === 0) return { score: 0, compliancePct: 0, syncPct: 0, encryptPct: 0 };
+
+    const compliant = tDevices.filter(d => d.complianceState === 'compliant').length;
+    const now = Date.now();
+    const freshSync = tDevices.filter(d => d.lastSyncDateTime && (now - new Date(d.lastSyncDateTime).getTime()) < 7 * 86400000).length;
+    const encrypted = tDevices.filter(d => d.isEncrypted).length;
+
+    const compliancePct = (compliant / total) * 100;
+    const syncPct = (freshSync / total) * 100;
+    const encryptPct = (encrypted / total) * 100;
+
+    const score = Math.round(compliancePct * 0.4 + syncPct * 0.3 + encryptPct * 0.3);
+    return { score, compliancePct: Math.round(compliancePct), syncPct: Math.round(syncPct), encryptPct: Math.round(encryptPct) };
+  },
+
+  _healthColor(score) {
+    if (score >= 80) return 'var(--success)';
+    if (score >= 50) return 'var(--warning)';
+    return 'var(--danger)';
+  },
+
+  _healthClass(score) {
+    if (score >= 80) return '';
+    if (score >= 50) return 'warning';
+    return 'critical';
+  },
+
+  /* ============================================================
+     Main render
+     ============================================================ */
   render() {
     const main = document.getElementById('mainContent');
     const tenants = AppState.get('tenants');
@@ -10,19 +218,56 @@ const Dashboard = {
     const allDevices = AppState.getDevicesForContext();
     const tier = AppState.get('licenseTier');
 
-    // Device stats
+    // ---- Aggregate stats ----
     const total = allDevices.length;
     const compliant = allDevices.filter(d => d.complianceState === 'compliant').length;
     const nonCompliant = allDevices.filter(d => d.complianceState === 'noncompliant').length;
-    const windows = allDevices.filter(d => (d.operatingSystem || '').toLowerCase().includes('windows')).length;
-    const mac = allDevices.filter(d => (d.operatingSystem || '').toLowerCase().includes('macos')).length;
-    const mobile = allDevices.filter(d => {
-      const os = (d.operatingSystem || '').toLowerCase();
-      return os.includes('ios') || os.includes('android');
-    }).length;
+    const unknown = total - compliant - nonCompliant;
+    const compPct = this._pct(compliant, total);
+    const nonCompPct = this._pct(nonCompliant, total);
+    const unknownPct = this._pct(unknown, total);
 
-    // Compliance percentage
-    const compPct = total > 0 ? Math.round((compliant / total) * 100) : 0;
+    const now = Date.now();
+    const sevenDays = 7 * 86400000;
+    const staleDevices = allDevices.filter(d => d.lastSyncDateTime && (now - new Date(d.lastSyncDateTime).getTime()) > sevenDays);
+    const staleCount = staleDevices.length;
+
+    // OS counts
+    const osGroups = {};
+    allDevices.forEach(d => {
+      const raw = (d.operatingSystem || 'Other').toLowerCase();
+      let label = 'Other';
+      if (raw.includes('windows')) label = 'Windows';
+      else if (raw.includes('macos')) label = 'macOS';
+      else if (raw.includes('ios')) label = 'iOS';
+      else if (raw.includes('android')) label = 'Android';
+      else if (raw.includes('linux')) label = 'Linux';
+      osGroups[label] = (osGroups[label] || 0) + 1;
+    });
+
+    // Sparkline data
+    const enrollTrend = this._buildTrendBuckets(allDevices, 'enrolledDateTime');
+    const syncTrend = this._buildTrendBuckets(allDevices, 'lastSyncDateTime');
+
+    // Activity events
+    const activityEvents = this._buildActivityEvents(allDevices);
+
+    // Stale top 5
+    const staleTop5 = staleDevices
+      .sort((a, b) => new Date(a.lastSyncDateTime) - new Date(b.lastSyncDateTime))
+      .slice(0, 5);
+
+    // OS bar colors
+    const osColors = {
+      'Windows': 'var(--primary)',
+      'macOS': 'var(--gray-600)',
+      'iOS': 'var(--secondary)',
+      'Android': 'var(--success)',
+      'Linux': 'var(--warning)',
+      'Other': 'var(--gray-400)'
+    };
+
+    const osEntries = Object.entries(osGroups).sort((a, b) => b[1] - a[1]);
 
     main.innerHTML = `
       <!-- Sponsor Banner (free tier only) -->
@@ -52,42 +297,131 @@ const Dashboard = {
         </div>
       </div>
 
-      <!-- KPI Cards -->
-      <div class="grid grid-4 gap-4 mb-6 stagger">
+      <!-- ======== KPI Cards (5 cards) ======== -->
+      <div class="grid grid-5 gap-4 mb-4 stagger">
+        <!-- Total Devices -->
         <div class="stat-card animate-fade-up">
-          <div class="stat-card-icon blue">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <div class="flex items-center justify-between mb-3">
+            <div class="stat-card-icon blue">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            ${total > 0 ? `<div data-tooltip="Enrollments last 7 days">${this._sparkline(enrollTrend, 'var(--primary)')}</div>` : ''}
           </div>
           <div class="stat-card-value">${total}</div>
           <div class="stat-card-label">Total Devices</div>
         </div>
+
+        <!-- Compliant -->
         <div class="stat-card animate-fade-up">
-          <div class="stat-card-icon green">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div class="flex items-center justify-between mb-3">
+            <div class="stat-card-icon green">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            ${compliant > 0 ? `<div data-tooltip="Sync activity last 7 days">${this._sparkline(syncTrend, 'var(--success)')}</div>` : ''}
           </div>
           <div class="stat-card-value">${compliant}</div>
           <div class="stat-card-label">Compliant</div>
           ${total > 0 ? `<div class="stat-card-trend up">&#9650; ${compPct}%</div>` : ''}
         </div>
+
+        <!-- Non-Compliant -->
         <div class="stat-card animate-fade-up">
-          <div class="stat-card-icon red">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <div class="flex items-center justify-between mb-3">
+            <div class="stat-card-icon red">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
           </div>
           <div class="stat-card-value">${nonCompliant}</div>
           <div class="stat-card-label">Non-Compliant</div>
           ${nonCompliant > 0 ? `<div class="stat-card-trend down">Needs attention</div>` : ''}
         </div>
+
+        <!-- Connected Tenants -->
         <div class="stat-card animate-fade-up">
-          <div class="stat-card-icon teal">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          <div class="flex items-center justify-between mb-3">
+            <div class="stat-card-icon teal">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            </div>
           </div>
           <div class="stat-card-value">${tenants.length}</div>
           <div class="stat-card-label">Connected Tenants</div>
         </div>
+
+        <!-- Stale Devices -->
+        <div class="stat-card animate-fade-up" ${staleCount > 0 ? 'style="border-color: var(--warning-pale);"' : ''}>
+          <div class="flex items-center justify-between mb-3">
+            <div class="stat-card-icon orange">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+          </div>
+          <div class="stat-card-value">${staleCount}</div>
+          <div class="stat-card-label">Stale Devices</div>
+          ${staleCount > 0 ? `<div class="stat-card-trend down">7+ days silent</div>` : `<div class="stat-card-trend up">All fresh</div>`}
+        </div>
       </div>
 
+      <!-- ======== Quick Actions Row ======== -->
+      ${tenants.length > 0 ? `
+        <div class="flex items-center gap-3 mb-6 flex-wrap animate-fade-up">
+          <button class="btn btn-secondary" onclick="Dashboard._syncAllDevices()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Sync All Devices
+          </button>
+          <button class="btn btn-secondary" onclick="Dashboard._exportFullReport(AppState.getDevicesForContext())">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Full Report
+          </button>
+          <button class="btn btn-secondary" onclick="Devices.complianceFilter='noncompliant'; Router.navigate('devices');">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            View Non-Compliant
+          </button>
+          <button class="btn btn-primary" onclick="Auth.showConnectModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Tenant
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- ======== Stale Devices Warning Card ======== -->
+      ${staleCount > 0 ? `
+        <div class="card animate-fade-up mb-6" style="border-color: var(--warning-pale); background: var(--warning-bg);">
+          <div class="card-header" style="border-bottom-color: var(--warning-pale);">
+            <div class="flex items-center gap-3">
+              <div class="stat-card-icon orange" style="width:32px; height:32px; margin-bottom:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div>
+                <div class="card-header-title">${staleCount} Stale Device${staleCount !== 1 ? 's' : ''} Detected</div>
+                <div class="card-header-subtitle">These devices have not synced in over 7 days</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="Devices.complianceFilter='all'; Router.navigate('devices');">View All</button>
+          </div>
+          <div class="card-body" style="padding: var(--sp-3) var(--sp-5);">
+            <div class="flex flex-col gap-2">
+              ${staleTop5.map(d => `
+                <div class="flex items-center justify-between py-2" style="border-bottom: 1px solid var(--warning-pale); cursor:pointer;" onclick="Devices.showDetail('${d._tenantId}','${d.id}')">
+                  <div class="flex items-center gap-3">
+                    <div class="table-device-icon" style="width:28px; height:28px;">${Devices.getOSIcon(d.operatingSystem)}</div>
+                    <div>
+                      <div class="text-sm fw-500">${d.deviceName || 'Unknown'}</div>
+                      <div class="text-xs text-muted">${d.userPrincipalName || '-'}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="chip">${AppState.getTenantName(d._tenantId)}</span>
+                    <span class="text-xs text-muted">Last sync: ${this._relativeTime(d.lastSyncDateTime)}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            ${staleCount > 5 ? `<div class="text-center mt-3"><button class="btn btn-ghost btn-sm" onclick="Devices.complianceFilter='all'; Router.navigate('devices');">+${staleCount - 5} more stale devices</button></div>` : ''}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="grid grid-2 gap-6 mb-6">
-        <!-- Compliance Overview -->
+        <!-- ======== Compliance Donut with Legend ======== -->
         <div class="card animate-fade-up">
           <div class="card-header">
             <div class="card-header-title">Compliance Overview</div>
@@ -97,13 +431,35 @@ const Dashboard = {
               <div class="text-center text-muted py-3">No device data available</div>
             ` : `
               <div class="flex items-center gap-6 mb-4">
-                <div style="position:relative; width:120px; height:120px;">
-                  <svg viewBox="0 0 36 36" style="width:120px; height:120px; transform: rotate(-90deg);">
-                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--gray-100)" stroke-width="3"/>
-                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--success)" stroke-width="3"
-                      stroke-dasharray="${compPct} ${100 - compPct}"
-                      stroke-linecap="round" style="transition: stroke-dasharray 0.8s ease;"/>
-                  </svg>
+                <div style="position:relative; width:140px; height:140px; flex-shrink:0;">
+                  ${(() => {
+                    // SVG donut with three segments
+                    const r = 15.5, circ = 2 * Math.PI * r;
+                    const compLen = (compPct / 100) * circ;
+                    const nonCompLen = (nonCompPct / 100) * circ;
+                    const unknownLen = (unknownPct / 100) * circ;
+                    const compOff = 0;
+                    const nonCompOff = compLen;
+                    const unknownOff = compLen + nonCompLen;
+                    return `
+                      <svg viewBox="0 0 36 36" style="width:140px; height:140px; transform: rotate(-90deg);">
+                        <circle cx="18" cy="18" r="${r}" fill="none" stroke="var(--gray-100)" stroke-width="3"/>
+                        <circle cx="18" cy="18" r="${r}" fill="none" stroke="var(--success)" stroke-width="3"
+                          stroke-dasharray="${compLen} ${circ - compLen}" stroke-dashoffset="${-compOff}"
+                          stroke-linecap="round" style="transition: stroke-dasharray 0.8s ease;"/>
+                        ${nonCompPct > 0 ? `
+                          <circle cx="18" cy="18" r="${r}" fill="none" stroke="var(--danger)" stroke-width="3"
+                            stroke-dasharray="${nonCompLen} ${circ - nonCompLen}" stroke-dashoffset="${-nonCompOff}"
+                            style="transition: stroke-dasharray 0.8s ease;"/>
+                        ` : ''}
+                        ${unknownPct > 0 ? `
+                          <circle cx="18" cy="18" r="${r}" fill="none" stroke="var(--gray-300)" stroke-width="3"
+                            stroke-dasharray="${unknownLen} ${circ - unknownLen}" stroke-dashoffset="${-unknownOff}"
+                            style="transition: stroke-dasharray 0.8s ease;"/>
+                        ` : ''}
+                      </svg>
+                    `;
+                  })()}
                   <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column;">
                     <span class="text-2xl fw-700">${compPct}%</span>
                     <span class="text-xs text-muted">Compliant</span>
@@ -115,29 +471,44 @@ const Dashboard = {
                       <span class="text-sm">Compliant</span>
                       <span class="text-sm fw-600" style="color:var(--success);">${compliant}</span>
                     </div>
-                    <div class="progress-bar"><div class="progress-bar-fill green" style="width:${total > 0 ? (compliant/total*100) : 0}%"></div></div>
+                    <div class="progress-bar"><div class="progress-bar-fill green" style="width:${this._pct(compliant, total)}%"></div></div>
                   </div>
                   <div>
                     <div class="flex justify-between mb-1">
                       <span class="text-sm">Non-Compliant</span>
                       <span class="text-sm fw-600" style="color:var(--danger);">${nonCompliant}</span>
                     </div>
-                    <div class="progress-bar"><div class="progress-bar-fill red" style="width:${total > 0 ? (nonCompliant/total*100) : 0}%"></div></div>
+                    <div class="progress-bar"><div class="progress-bar-fill red" style="width:${this._pct(nonCompliant, total)}%"></div></div>
                   </div>
                   <div>
                     <div class="flex justify-between mb-1">
                       <span class="text-sm">Unknown</span>
-                      <span class="text-sm fw-600" style="color:var(--ink-tertiary);">${total - compliant - nonCompliant}</span>
+                      <span class="text-sm fw-600" style="color:var(--ink-tertiary);">${unknown}</span>
                     </div>
-                    <div class="progress-bar"><div class="progress-bar-fill" style="width:${total > 0 ? ((total-compliant-nonCompliant)/total*100) : 0}%; background: var(--gray-300);"></div></div>
+                    <div class="progress-bar"><div class="progress-bar-fill" style="width:${this._pct(unknown, total)}%; background: var(--gray-300);"></div></div>
                   </div>
+                </div>
+              </div>
+              <!-- Donut Legend -->
+              <div class="flex items-center justify-center gap-5" style="border-top: 1px solid var(--border-light); padding-top: var(--sp-3);">
+                <div class="flex items-center gap-2">
+                  <span style="width:10px; height:10px; border-radius:50%; background:var(--success); display:inline-block;"></span>
+                  <span class="text-xs">Compliant (${compPct}%)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span style="width:10px; height:10px; border-radius:50%; background:var(--danger); display:inline-block;"></span>
+                  <span class="text-xs">Non-Compliant (${nonCompPct}%)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span style="width:10px; height:10px; border-radius:50%; background:var(--gray-300); display:inline-block;"></span>
+                  <span class="text-xs">Unknown (${unknownPct}%)</span>
                 </div>
               </div>
             `}
           </div>
         </div>
 
-        <!-- OS Distribution -->
+        <!-- ======== OS Distribution — Stacked Bar ======== -->
         <div class="card animate-fade-up">
           <div class="card-header">
             <div class="card-header-title">Device Platform Distribution</div>
@@ -146,50 +517,64 @@ const Dashboard = {
             ${total === 0 ? `
               <div class="text-center text-muted py-3">No device data available</div>
             ` : `
-              <div class="flex flex-col gap-4">
-                <div class="flex items-center gap-3">
-                  <div class="table-device-icon" style="background: var(--primary-pale);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--primary)"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-                  </div>
-                  <div style="flex:1;">
-                    <div class="flex justify-between mb-1">
-                      <span class="text-sm fw-500">Windows</span>
-                      <span class="text-sm text-muted">${windows}</span>
+              <!-- Stacked horizontal bar -->
+              <div style="height:32px; border-radius:var(--radius-full); overflow:hidden; display:flex; margin-bottom:var(--sp-4);">
+                ${osEntries.map(([label, count]) => {
+                  const pct = this._pct(count, total);
+                  const color = osColors[label] || 'var(--gray-400)';
+                  return pct > 0 ? `<div style="width:${pct}%; background:${color}; display:flex; align-items:center; justify-content:center; min-width:${pct > 5 ? '0' : '24px'}; transition: width 0.6s ease;" data-tooltip="${label}: ${count} (${pct}%)">
+                    ${pct >= 8 ? `<span class="text-xs fw-600" style="color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.3);">${pct}%</span>` : ''}
+                  </div>` : '';
+                }).join('')}
+              </div>
+              <!-- Legend -->
+              <div class="flex flex-wrap gap-4">
+                ${osEntries.map(([label, count]) => {
+                  const pct = this._pct(count, total);
+                  const color = osColors[label] || 'var(--gray-400)';
+                  return `
+                    <div class="flex items-center gap-2">
+                      <span style="width:10px; height:10px; border-radius:3px; background:${color}; display:inline-block;"></span>
+                      <span class="text-sm fw-500">${label}</span>
+                      <span class="text-xs text-muted">${count} (${pct}%)</span>
                     </div>
-                    <div class="progress-bar"><div class="progress-bar-fill" style="width:${total > 0 ? (windows/total*100) : 0}%"></div></div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <div class="table-device-icon" style="background: var(--gray-100);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-                  </div>
-                  <div style="flex:1;">
-                    <div class="flex justify-between mb-1">
-                      <span class="text-sm fw-500">macOS</span>
-                      <span class="text-sm text-muted">${mac}</span>
-                    </div>
-                    <div class="progress-bar"><div class="progress-bar-fill" style="width:${total > 0 ? (mac/total*100) : 0}%; background: var(--gray-600);"></div></div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <div class="table-device-icon" style="background: var(--success-pale);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                  </div>
-                  <div style="flex:1;">
-                    <div class="flex justify-between mb-1">
-                      <span class="text-sm fw-500">iOS / Android</span>
-                      <span class="text-sm text-muted">${mobile}</span>
-                    </div>
-                    <div class="progress-bar"><div class="progress-bar-fill green" style="width:${total > 0 ? (mobile/total*100) : 0}%"></div></div>
-                  </div>
-                </div>
+                  `;
+                }).join('')}
               </div>
             `}
           </div>
         </div>
       </div>
 
-      <!-- Tenant Health Grid (mini cards) -->
+      <!-- ======== Activity Timeline ======== -->
+      ${activityEvents.length > 0 ? `
+        <div class="card animate-fade-up mb-6">
+          <div class="card-header">
+            <div>
+              <div class="card-header-title">Recent Activity</div>
+              <div class="card-header-subtitle">Latest device events from your fleet</div>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="flex flex-col">
+              ${activityEvents.map((ev, i) => `
+                <div class="flex items-center gap-3 px-4 py-3" style="border-bottom: 1px solid var(--border-light);${i === activityEvents.length - 1 ? ' border-bottom:none;' : ''}">
+                  <div class="flex items-center justify-center" style="width:32px; height:32px; border-radius:var(--radius-sm); background:var(--gray-50); flex-shrink:0;">
+                    ${ev.icon}
+                  </div>
+                  <div style="flex:1; min-width:0;">
+                    <div class="text-sm">${ev.desc}</div>
+                  </div>
+                  <span class="chip">${ev.tenant}</span>
+                  <span class="text-xs text-muted" style="flex-shrink:0; min-width:56px; text-align:right;">${this._relativeTime(ev.date)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- ======== Tenant Health Grid ======== -->
       ${tenants.length > 0 ? `
         <div class="card animate-fade-up mb-6">
           <div class="card-header">
@@ -200,22 +585,39 @@ const Dashboard = {
             <div class="grid grid-auto gap-3 stagger">
               ${tenants.slice(0, 8).map((t, i) => {
                 const tDevices = AppState.get('devices')[t.id] || [];
-                const tCompliant = tDevices.filter(d => d.complianceState === 'compliant').length;
-                const tTotal = tDevices.length;
-                const tPct = tTotal > 0 ? Math.round((tCompliant / tTotal) * 100) : 0;
+                const health = this._calcHealthScore(tDevices);
+                const hColor = this._healthColor(health.score);
+                const hClass = this._healthClass(health.score);
                 return `
-                  <div class="tenant-card ${tPct >= 80 ? '' : tPct >= 50 ? 'warning' : 'critical'} animate-fade-up"
+                  <div class="tenant-card ${hClass} animate-fade-up"
                        onclick="Tenants.selectTenant('${t.id}')" style="animation-delay: ${i * 50}ms; padding: 12px 16px;">
                     <div class="flex items-center justify-between mb-2">
                       <span class="fw-500 truncate" style="font-size: var(--text-sm);">${t.displayName}</span>
                       <span class="badge ${t.connectionType === 'gdap' ? 'badge-primary' : 'badge-default'}" style="font-size:10px;">${t.connectionType === 'gdap' ? 'GDAP' : 'Direct'}</span>
                     </div>
-                    <div class="flex items-center gap-3">
-                      <span class="text-xs text-muted">${tTotal} devices</span>
-                      <div class="progress-bar" style="flex:1;">
-                        <div class="progress-bar-fill ${tPct >= 80 ? 'green' : tPct >= 50 ? 'orange' : 'red'}" style="width:${tPct}%"></div>
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-2xl fw-700" style="color:${hColor}; line-height:1;">${health.score}</span>
+                      <span class="text-xs text-muted">health score</span>
+                    </div>
+                    <div class="progress-bar mb-2" style="height:4px;">
+                      <div class="progress-bar-fill" style="width:${health.score}%; background:${hColor};"></div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-muted">${tDevices.length} devices</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs" data-tooltip="Compliance ${health.compliancePct}%">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                          ${health.compliancePct}%
+                        </span>
+                        <span class="text-xs" data-tooltip="Sync freshness ${health.syncPct}%">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="3"><polyline points="1 4 1 10 7 10"/></svg>
+                          ${health.syncPct}%
+                        </span>
+                        <span class="text-xs" data-tooltip="Encryption ${health.encryptPct}%">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="3"><rect x="3" y="11" width="18" height="11" rx="2"/></svg>
+                          ${health.encryptPct}%
+                        </span>
                       </div>
-                      <span class="text-xs fw-600">${tPct}%</span>
                     </div>
                   </div>
                 `;
@@ -226,7 +628,7 @@ const Dashboard = {
         </div>
       ` : ''}
 
-      <!-- Recently Non-Compliant Devices -->
+      <!-- ======== Non-Compliant Devices Table ======== -->
       ${nonCompliant > 0 ? `
         <div class="card animate-fade-up mb-6">
           <div class="card-header">
@@ -268,7 +670,7 @@ const Dashboard = {
         </div>
       ` : ''}
 
-      <!-- Getting Started (if no tenants) -->
+      <!-- ======== Getting Started (if no tenants) ======== -->
       ${tenants.length === 0 ? `
         <div class="card animate-fade-up">
           <div class="card-body" style="padding: 3rem;">

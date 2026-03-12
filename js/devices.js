@@ -10,6 +10,7 @@ const Devices = {
   pageSize: 25,
   sortField: 'deviceName',
   sortDir: 'asc',
+  activeDetailTab: 'overview',
 
   render() {
     const main = document.getElementById('mainContent');
@@ -46,6 +47,14 @@ const Devices = {
                 <div class="dropdown-item" onclick="Devices.bulkAction('lock')">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                   Lock Devices
+                </div>
+                <div class="dropdown-item" onclick="Devices.bulkAction('defenderScan')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Defender Quick Scan
+                </div>
+                <div class="dropdown-item" onclick="Devices.bulkAction('defenderUpdate')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                  Update Defender Signatures
                 </div>
                 <div class="dropdown-divider"></div>
                 <div class="dropdown-item danger" onclick="Devices.bulkAction('retire')">
@@ -103,15 +112,17 @@ const Devices = {
               <th onclick="Devices.sort('operatingSystem')" style="cursor:pointer;">OS ${this.sortIcon('operatingSystem')}</th>
               <th>OS Version</th>
               <th onclick="Devices.sort('complianceState')" style="cursor:pointer;">Compliance ${this.sortIcon('complianceState')}</th>
+              <th onclick="Devices.sort('managementAgent')" style="cursor:pointer;">Managed By ${this.sortIcon('managementAgent')}</th>
               <th>Primary User</th>
               <th onclick="Devices.sort('lastSyncDateTime')" style="cursor:pointer;">Last Sync ${this.sortIcon('lastSyncDateTime')}</th>
+              <th>Storage</th>
               <th>Encryption</th>
               <th style="width:40px;"></th>
             </tr>
           </thead>
           <tbody>
             ${paged.length === 0 ? `
-              <tr><td colspan="${isAllTenants ? 10 : 9}" class="text-center text-muted" style="padding:3rem;">
+              <tr><td colspan="${isAllTenants ? 13 : 12}" class="text-center text-muted" style="padding:3rem;">
                 ${allDevices.length === 0 ? 'No devices found. Connect a tenant to load devices.' : 'No devices match your filters.'}
               </td></tr>
             ` : paged.map(d => this.renderDeviceRow(d, isAllTenants)).join('')}
@@ -137,6 +148,9 @@ const Devices = {
     const isSelected = selected.includes(device.id);
     const osIcon = this.getOSIcon(device.operatingSystem);
     const complianceBadge = this.getComplianceBadge(device.complianceState);
+    const storageBar = this.renderStorageMiniBar(device);
+    const relativeSync = this.relativeTime(device.lastSyncDateTime);
+    const managedBy = this.formatManagementAgent(device.managementAgent);
 
     return `
       <tr class="${isSelected ? 'selected' : ''}" onclick="Devices.showDetail('${device._tenantId}', '${device.id}')" style="cursor:pointer;">
@@ -157,8 +171,13 @@ const Devices = {
         <td>${device.operatingSystem || '-'}</td>
         <td class="text-mono text-xs">${device.osVersion || '-'}</td>
         <td>${complianceBadge}</td>
+        <td class="text-sm">${managedBy}</td>
         <td class="text-sm">${device.userPrincipalName || device.emailAddress || '-'}</td>
-        <td class="text-sm">${this.formatDate(device.lastSyncDateTime)}</td>
+        <td class="text-sm">
+          <span title="${this.formatDate(device.lastSyncDateTime)}">${relativeSync}</span>
+          <span class="text-xs text-muted" style="display:block;">${this.formatDate(device.lastSyncDateTime)}</span>
+        </td>
+        <td>${storageBar}</td>
         <td>${device.isEncrypted ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-default">No</span>'}</td>
         <td onclick="event.stopPropagation()">
           <div class="dropdown">
@@ -168,10 +187,18 @@ const Devices = {
               <div class="dropdown-item" onclick="Devices.action('restart','${device._tenantId}','${device.id}')">Restart</div>
               <div class="dropdown-item" onclick="Devices.action('lock','${device._tenantId}','${device.id}')">Lock</div>
               <div class="dropdown-item" onclick="Devices.action('rename','${device._tenantId}','${device.id}')">Rename</div>
+              <div class="dropdown-item" onclick="Devices.action('defenderScan','${device._tenantId}','${device.id}')">Defender Scan</div>
+              <div class="dropdown-item" onclick="Devices.action('defenderUpdate','${device._tenantId}','${device.id}')">Update Signatures</div>
+              <div class="dropdown-item" onclick="Devices.action('shutdown','${device._tenantId}','${device.id}')">Shutdown</div>
+              <div class="dropdown-item" onclick="Devices.action('collectDiags','${device._tenantId}','${device.id}')">Collect Diagnostics</div>
+              <div class="dropdown-item" onclick="Devices.action('locate','${device._tenantId}','${device.id}')">Locate Device</div>
               <div class="dropdown-item" onclick="Devices.action('bitlocker','${device._tenantId}','${device.id}')">BitLocker Keys</div>
+              <div class="dropdown-item" onclick="Devices.action('rotateBitlocker','${device._tenantId}','${device.id}')">Rotate BitLocker</div>
+              <div class="dropdown-item" onclick="Devices.action('rotateFileVault','${device._tenantId}','${device.id}')">Rotate FileVault Key</div>
               <div class="dropdown-divider"></div>
               <div class="dropdown-item danger" onclick="Devices.action('retire','${device._tenantId}','${device.id}')">Retire</div>
               <div class="dropdown-item danger" onclick="Devices.action('wipe','${device._tenantId}','${device.id}')">Wipe</div>
+              <div class="dropdown-item danger" onclick="Devices.action('freshStart','${device._tenantId}','${device.id}')">Fresh Start</div>
             </div>
           </div>
         </td>
@@ -179,80 +206,450 @@ const Devices = {
     `;
   },
 
-  // Detail panel
+  // Storage mini-bar for table row
+  renderStorageMiniBar(device) {
+    if (!device.totalStorageSpaceInBytes || device.totalStorageSpaceInBytes === 0) return '-';
+    const totalGB = Math.round(device.totalStorageSpaceInBytes / 1073741824);
+    const freeGB = Math.round((device.freeStorageSpaceInBytes || 0) / 1073741824);
+    const usedGB = totalGB - freeGB;
+    const usedPct = Math.round((usedGB / totalGB) * 100);
+    const barColor = usedPct > 90 ? 'var(--danger)' : usedPct > 75 ? 'var(--warning)' : 'var(--success)';
+    return `
+      <div style="min-width:60px;" title="${usedGB} GB used / ${totalGB} GB total">
+        <div style="font-size:11px;margin-bottom:2px;">${usedPct}%</div>
+        <div class="progress-bar" style="height:4px;width:60px;">
+          <div class="progress-bar-fill" style="width:${usedPct}%;background:${barColor};"></div>
+        </div>
+      </div>
+    `;
+  },
+
+  // Format management agent
+  formatManagementAgent(agent) {
+    if (!agent) return '-';
+    const map = {
+      'mdm': 'Intune (MDM)',
+      'eas': 'EAS',
+      'easMdm': 'EAS + MDM',
+      'intuneClient': 'Intune Client',
+      'easIntuneClient': 'EAS + Client',
+      'configurationManagerClient': 'SCCM',
+      'configurationManagerClientMdm': 'Co-managed',
+      'unknown': 'Unknown',
+      'jamf': 'Jamf',
+      'googleCloudDevicePolicyController': 'Google'
+    };
+    return `<span class="chip">${map[agent] || agent}</span>`;
+  },
+
+  // Relative time helper
+  relativeTime(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '-';
+    const now = new Date();
+    const diffMs = now - d;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDay < 30) return `${diffDay}d ago`;
+    const diffMonth = Math.floor(diffDay / 30);
+    return `${diffMonth}mo ago`;
+  },
+
+  // Detail panel with tabbed interface
   async showDetail(tenantId, deviceId) {
     const devices = AppState.get('devices')[tenantId] || [];
     const device = devices.find(d => d.id === deviceId);
     if (!device) return;
+
+    this.activeDetailTab = 'overview';
+    this._detailTenantId = tenantId;
+    this._detailDeviceId = deviceId;
 
     const panel = document.getElementById('deviceDetailPanel');
     const body = document.getElementById('detailPanelBody');
     const actions = document.getElementById('detailPanelActions');
     document.getElementById('detailDeviceName').textContent = device.deviceName || 'Device Details';
 
-    body.innerHTML = `
-      <div class="detail-section">
-        <div class="detail-section-title">Device Information</div>
-        <div class="detail-row"><span class="detail-label">Device Name</span><span class="detail-value">${device.deviceName || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Manufacturer</span><span class="detail-value">${device.manufacturer || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${device.model || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Serial Number</span><span class="detail-value text-mono">${device.serialNumber || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Enrolled</span><span class="detail-value">${this.formatDate(device.enrolledDateTime)}</span></div>
-        <div class="detail-row"><span class="detail-label">Last Sync</span><span class="detail-value">${this.formatDate(device.lastSyncDateTime)}</span></div>
-        <div class="detail-row"><span class="detail-label">Tenant</span><span class="detail-value">${AppState.getTenantName(tenantId)}</span></div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">Operating System</div>
-        <div class="detail-row"><span class="detail-label">OS</span><span class="detail-value">${device.operatingSystem || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Version</span><span class="detail-value text-mono">${device.osVersion || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Architecture</span><span class="detail-value">${device.operatingSystemEdition || '-'}</span></div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">Security & Compliance</div>
-        <div class="detail-row"><span class="detail-label">Compliance</span><span class="detail-value">${this.getComplianceBadge(device.complianceState)}</span></div>
-        <div class="detail-row"><span class="detail-label">Encrypted</span><span class="detail-value">${device.isEncrypted ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-danger">No</span>'}</span></div>
-        <div class="detail-row"><span class="detail-label">Supervised</span><span class="detail-value">${device.isSupervised ? 'Yes' : 'No'}</span></div>
-        <div class="detail-row"><span class="detail-label">Jailbroken</span><span class="detail-value">${device.jailBroken === 'True' ? '<span class="badge badge-danger">Yes</span>' : 'No'}</span></div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">User & Storage</div>
-        <div class="detail-row"><span class="detail-label">Primary User</span><span class="detail-value">${device.userPrincipalName || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${device.emailAddress || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Total Storage</span><span class="detail-value">${device.totalStorageSpaceInBytes ? Math.round(device.totalStorageSpaceInBytes / 1073741824) + ' GB' : '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Free Storage</span><span class="detail-value">${device.freeStorageSpaceInBytes ? Math.round(device.freeStorageSpaceInBytes / 1073741824) + ' GB' : '-'}</span></div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-section-title">Network</div>
-        <div class="detail-row"><span class="detail-label">Wi-Fi MAC</span><span class="detail-value text-mono">${device.wiFiMacAddress || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">Ethernet MAC</span><span class="detail-value text-mono">${device.ethernetMacAddress || '-'}</span></div>
-        <div class="detail-row"><span class="detail-label">IMEI</span><span class="detail-value text-mono">${device.imei || '-'}</span></div>
-      </div>
-    `;
-
-    actions.innerHTML = `
-      <button class="btn btn-secondary btn-sm" onclick="Devices.action('sync','${tenantId}','${deviceId}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-        Sync
-      </button>
-      <button class="btn btn-secondary btn-sm" onclick="Devices.action('restart','${tenantId}','${deviceId}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-        Restart
-      </button>
-      <button class="btn btn-secondary btn-sm" onclick="Devices.action('lock','${tenantId}','${deviceId}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        Lock
-      </button>
-      <button class="btn btn-danger btn-sm" onclick="Devices.action('retire','${tenantId}','${deviceId}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-        Retire
-      </button>
-    `;
+    body.innerHTML = this._renderDetailTabs(device, tenantId, deviceId);
+    actions.innerHTML = this._renderDetailActionsGrid(tenantId, deviceId, device);
 
     panel.classList.add('open');
+  },
+
+  _renderDetailTabs(device, tenantId, deviceId) {
+    const storageUsedPct = device.totalStorageSpaceInBytes
+      ? Math.round(((device.totalStorageSpaceInBytes - (device.freeStorageSpaceInBytes || 0)) / device.totalStorageSpaceInBytes) * 100)
+      : 0;
+    const totalGB = device.totalStorageSpaceInBytes ? Math.round(device.totalStorageSpaceInBytes / 1073741824) : 0;
+    const freeGB = device.freeStorageSpaceInBytes ? Math.round(device.freeStorageSpaceInBytes / 1073741824) : 0;
+    const usedGB = totalGB - freeGB;
+    const storageBarColor = storageUsedPct > 90 ? 'var(--danger)' : storageUsedPct > 75 ? 'var(--warning)' : 'var(--success)';
+    const memoryGB = device.physicalMemoryInBytes ? (device.physicalMemoryInBytes / 1073741824).toFixed(1) : null;
+
+    return `
+      <div class="tabs" style="margin-bottom:16px;">
+        <button class="tab active" data-tab="overview" onclick="Devices.switchDetailTab('overview', this)">Overview</button>
+        <button class="tab" data-tab="hardware" onclick="Devices.switchDetailTab('hardware', this)">Hardware</button>
+        <button class="tab" data-tab="compliance" onclick="Devices.switchDetailTab('compliance', this)">Compliance</button>
+        <button class="tab" data-tab="apps" onclick="Devices.switchDetailTab('apps', this)">Apps</button>
+        <button class="tab" data-tab="config" onclick="Devices.switchDetailTab('config', this)">Config</button>
+        <button class="tab" data-tab="notes" onclick="Devices.switchDetailTab('notes', this)">Notes</button>
+      </div>
+
+      <!-- Overview Tab -->
+      <div class="detail-tab-content" id="detailTab-overview" style="display:block;">
+        <div class="detail-section">
+          <div class="detail-section-title">Device Information</div>
+          <div class="detail-row"><span class="detail-label">Device Name</span><span class="detail-value">${device.deviceName || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Manufacturer</span><span class="detail-value">${device.manufacturer || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${device.model || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Serial Number</span><span class="detail-value text-mono">${device.serialNumber || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Enrolled</span><span class="detail-value">${this.formatDate(device.enrolledDateTime)}</span></div>
+          <div class="detail-row"><span class="detail-label">Last Sync</span><span class="detail-value">${this.relativeTime(device.lastSyncDateTime)} &mdash; ${this.formatDate(device.lastSyncDateTime)}</span></div>
+          <div class="detail-row"><span class="detail-label">Managed By</span><span class="detail-value">${this.formatManagementAgent(device.managementAgent)}</span></div>
+          <div class="detail-row"><span class="detail-label">Tenant</span><span class="detail-value">${AppState.getTenantName(tenantId)}</span></div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">Operating System</div>
+          <div class="detail-row"><span class="detail-label">OS</span><span class="detail-value">${device.operatingSystem || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Version</span><span class="detail-value text-mono">${device.osVersion || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Architecture</span><span class="detail-value">${device.operatingSystemEdition || '-'}</span></div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">Security & Compliance</div>
+          <div class="detail-row"><span class="detail-label">Compliance</span><span class="detail-value">${this.getComplianceBadge(device.complianceState)}</span></div>
+          <div class="detail-row"><span class="detail-label">Encrypted</span><span class="detail-value">${device.isEncrypted ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-danger">No</span>'}</span></div>
+          <div class="detail-row"><span class="detail-label">Supervised</span><span class="detail-value">${device.isSupervised ? 'Yes' : 'No'}</span></div>
+          <div class="detail-row"><span class="detail-label">Jailbroken</span><span class="detail-value">${device.jailBroken === 'True' ? '<span class="badge badge-danger">Yes</span>' : 'No'}</span></div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">User & Network</div>
+          <div class="detail-row"><span class="detail-label">Primary User</span><span class="detail-value">${device.userPrincipalName || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${device.emailAddress || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Wi-Fi MAC</span><span class="detail-value text-mono">${device.wiFiMacAddress || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Ethernet MAC</span><span class="detail-value text-mono">${device.ethernetMacAddress || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">IMEI</span><span class="detail-value text-mono">${device.imei || '-'}</span></div>
+        </div>
+      </div>
+
+      <!-- Hardware Tab -->
+      <div class="detail-tab-content" id="detailTab-hardware" style="display:none;">
+        <div class="detail-section">
+          <div class="detail-section-title">Hardware Details</div>
+          <div class="detail-row"><span class="detail-label">Manufacturer</span><span class="detail-value">${device.manufacturer || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${device.model || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Serial Number</span><span class="detail-value text-mono">${device.serialNumber || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Physical Memory</span><span class="detail-value">${memoryGB ? memoryGB + ' GB' : '-'}</span></div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title">Storage</div>
+          <div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${totalGB ? totalGB + ' GB' : '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Free</span><span class="detail-value">${totalGB ? freeGB + ' GB' : '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Used</span><span class="detail-value">${totalGB ? usedGB + ' GB (' + storageUsedPct + '%)' : '-'}</span></div>
+          ${totalGB ? `
+            <div style="margin-top:8px;">
+              <div class="progress-bar" style="height:12px;border-radius:6px;">
+                <div class="progress-bar-fill" style="width:${storageUsedPct}%;background:${storageBarColor};border-radius:6px;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--ink-tertiary);">
+                <span>${usedGB} GB used</span>
+                <span>${freeGB} GB free</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Compliance Tab -->
+      <div class="detail-tab-content" id="detailTab-compliance" style="display:none;">
+        <div class="detail-section">
+          <div class="detail-section-title">Compliance Policy States</div>
+          <div id="detailComplianceContent">
+            <div class="text-center text-muted" style="padding:2rem;">
+              <div class="spinner" style="margin:0 auto 8px;"></div>
+              Loading compliance data...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Apps Tab -->
+      <div class="detail-tab-content" id="detailTab-apps" style="display:none;">
+        <div class="detail-section">
+          <div class="detail-section-title">Installed Applications</div>
+          <div id="detailAppsContent">
+            <div class="text-center text-muted" style="padding:2rem;">
+              <div class="spinner" style="margin:0 auto 8px;"></div>
+              Loading installed apps...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Tab -->
+      <div class="detail-tab-content" id="detailTab-config" style="display:none;">
+        <div class="detail-section">
+          <div class="detail-section-title">Configuration Profile States</div>
+          <div id="detailConfigContent">
+            <div class="text-center text-muted" style="padding:2rem;">
+              <div class="spinner" style="margin:0 auto 8px;"></div>
+              Loading configuration states...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes Tab -->
+      <div class="detail-tab-content" id="detailTab-notes" style="display:none;">
+        <div class="detail-section">
+          <div class="detail-section-title">Device Notes</div>
+          <textarea id="detailDeviceNotes" style="width:100%;min-height:150px;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;resize:vertical;background:var(--bg-surface);color:var(--ink-primary);"
+                    placeholder="Add notes about this device...">${device.notes || ''}</textarea>
+          <div style="margin-top:8px;text-align:right;">
+            <button class="btn btn-secondary btn-sm" onclick="Devices.saveNotes('${tenantId}','${deviceId}')">Save Notes</button>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  switchDetailTab(tabName, btnEl) {
+    // Hide all tab content
+    const contents = document.querySelectorAll('.detail-tab-content');
+    contents.forEach(c => c.style.display = 'none');
+
+    // Remove active from all tab buttons
+    const tabs = document.querySelectorAll('.tabs .tab');
+    tabs.forEach(t => t.classList.remove('active'));
+
+    // Show selected tab and mark active
+    const target = document.getElementById('detailTab-' + tabName);
+    if (target) target.style.display = 'block';
+    if (btnEl) btnEl.classList.add('active');
+
+    this.activeDetailTab = tabName;
+
+    // Lazy-load data for tabs that need it
+    if (tabName === 'compliance') this._loadComplianceTab();
+    if (tabName === 'apps') this._loadAppsTab();
+    if (tabName === 'config') this._loadConfigTab();
+  },
+
+  async _loadComplianceTab() {
+    const container = document.getElementById('detailComplianceContent');
+    if (!container || container.dataset.loaded === 'true') return;
+    try {
+      const result = await Graph.getDeviceCompliance(this._detailTenantId, this._detailDeviceId);
+      const states = result?.value || result || [];
+      if (!states.length) {
+        container.innerHTML = '<div class="text-muted" style="padding:1rem;">No compliance policy states found.</div>';
+      } else {
+        container.innerHTML = states.map(s => {
+          const state = s.state || s.complianceStatus || 'unknown';
+          const isPass = state === 'compliant' || state === 'notApplicable';
+          const badgeClass = isPass ? 'badge-success' : (state === 'nonCompliant' || state === 'noncompliant' ? 'badge-danger' : 'badge-warning');
+          const label = s.displayName || s.settingName || s.policyName || 'Policy';
+          return `
+            <div class="detail-row">
+              <span class="detail-label" style="flex:1;">${label}</span>
+              <span class="detail-value"><span class="badge ${badgeClass}">${state}</span></span>
+            </div>
+          `;
+        }).join('');
+      }
+      container.dataset.loaded = 'true';
+    } catch (err) {
+      container.innerHTML = `<div class="text-muted" style="padding:1rem;color:var(--danger);">Failed to load compliance data: ${err.message}</div>`;
+    }
+  },
+
+  async _loadAppsTab() {
+    const container = document.getElementById('detailAppsContent');
+    if (!container || container.dataset.loaded === 'true') return;
+    try {
+      const result = await Graph.getDeviceInstalledApps(this._detailTenantId, this._detailDeviceId);
+      const apps = result?.value || result || [];
+      if (!apps.length) {
+        container.innerHTML = '<div class="text-muted" style="padding:1rem;">No installed apps found.</div>';
+      } else {
+        container.innerHTML = `
+          <div style="max-height:400px;overflow-y:auto;">
+            ${apps.map(a => {
+              const name = a.displayName || a.appName || a.name || 'Unknown App';
+              const version = a.version || a.displayVersion || '';
+              return `
+                <div class="detail-row">
+                  <span class="detail-label" style="flex:1;">${name}</span>
+                  <span class="detail-value text-mono text-xs">${version}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div class="text-xs text-muted" style="margin-top:8px;">${apps.length} app(s) found</div>
+        `;
+      }
+      container.dataset.loaded = 'true';
+    } catch (err) {
+      container.innerHTML = `<div class="text-muted" style="padding:1rem;color:var(--danger);">Failed to load installed apps: ${err.message}</div>`;
+    }
+  },
+
+  async _loadConfigTab() {
+    const container = document.getElementById('detailConfigContent');
+    if (!container || container.dataset.loaded === 'true') return;
+    try {
+      const result = await Graph.getDeviceConfigStates(this._detailTenantId, this._detailDeviceId);
+      const states = result?.value || result || [];
+      if (!states.length) {
+        container.innerHTML = '<div class="text-muted" style="padding:1rem;">No configuration profile states found.</div>';
+      } else {
+        container.innerHTML = states.map(s => {
+          const state = s.state || s.status || 'unknown';
+          const isOk = state === 'compliant' || state === 'succeeded' || state === 'notApplicable';
+          const badgeClass = isOk ? 'badge-success' : (state === 'error' || state === 'failed' || state === 'nonCompliant' ? 'badge-danger' : 'badge-warning');
+          const label = s.displayName || s.settingName || s.policyName || 'Profile';
+          return `
+            <div class="detail-row">
+              <span class="detail-label" style="flex:1;">${label}</span>
+              <span class="detail-value"><span class="badge ${badgeClass}">${state}</span></span>
+            </div>
+          `;
+        }).join('');
+      }
+      container.dataset.loaded = 'true';
+    } catch (err) {
+      container.innerHTML = `<div class="text-muted" style="padding:1rem;color:var(--danger);">Failed to load config states: ${err.message}</div>`;
+    }
+  },
+
+  async saveNotes(tenantId, deviceId) {
+    const textarea = document.getElementById('detailDeviceNotes');
+    if (!textarea) return;
+    const notes = textarea.value;
+    try {
+      await Graph.updateDeviceNotes(tenantId, deviceId, notes);
+      Toast.show('Device notes saved', 'success');
+    } catch (err) {
+      Toast.show('Failed to save notes: ' + err.message, 'error');
+    }
+  },
+
+  // Detail panel actions grid - categorized
+  _renderDetailActionsGrid(tenantId, deviceId, device) {
+    const isMac = (device.operatingSystem || '').toLowerCase().includes('mac');
+    const isWindows = (device.operatingSystem || '').toLowerCase().includes('windows');
+    const t = tenantId;
+    const d = deviceId;
+
+    return `
+      <div class="detail-actions" style="display:flex;flex-direction:column;gap:16px;">
+        <!-- Sync & Monitor -->
+        <div>
+          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--ink-tertiary);">Sync & Monitor</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('sync','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+              Sync
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('collectDiags','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Collect Diagnostics
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('locate','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Locate
+            </button>
+          </div>
+        </div>
+
+        <!-- Security -->
+        <div>
+          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--ink-tertiary);">Security</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('defenderScan','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Defender Scan
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('defenderUpdate','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+              Update Signatures
+            </button>
+            ${isWindows ? `
+              <button class="btn btn-secondary btn-sm" onclick="Devices.action('rotateBitlocker','${t}','${d}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                Rotate BitLocker
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="Devices.action('bitlocker','${t}','${d}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                BitLocker Keys
+              </button>
+            ` : ''}
+            ${isMac ? `
+              <button class="btn btn-secondary btn-sm" onclick="Devices.action('rotateFileVault','${t}','${d}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                Rotate FileVault
+              </button>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Power -->
+        <div>
+          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--ink-tertiary);">Power</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('restart','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              Restart
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('shutdown','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+              Shutdown
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="Devices.action('lock','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              Lock
+            </button>
+          </div>
+        </div>
+
+        <!-- Destructive -->
+        <div>
+          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--danger);">Destructive</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <button class="btn btn-danger btn-sm" onclick="Devices.action('retire','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              Retire
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="Devices.action('wipe','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+              Wipe
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="Devices.action('freshStart','${t}','${d}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6"/><path d="M2.66 15.57a10 10 0 10.57-8.38"/></svg>
+              Fresh Start
+            </button>
+          </div>
+        </div>
+
+        <!-- Rename dropdown at bottom -->
+        <div style="border-top:1px solid var(--border);padding-top:12px;">
+          <button class="btn btn-secondary btn-sm" onclick="Devices.action('rename','${t}','${d}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Rename Device
+          </button>
+        </div>
+      </div>
+    `;
   },
 
   closeDetail() {
@@ -290,19 +687,59 @@ const Devices = {
           await Graph.wipeDevice(tenantId, deviceId);
           Toast.show(`Wipe command sent to ${name}`, 'warning');
           break;
-        case 'rename':
+        case 'rename': {
           const newName = prompt(`Rename device (current: ${name}):`, name);
           if (!newName || newName === name) return;
           await Graph.renameDevice(tenantId, deviceId, newName);
           Toast.show(`Device renamed to ${newName}`, 'success');
           break;
-        case 'bitlocker':
+        }
+        case 'bitlocker': {
           const keys = await Graph.getBitLockerKeys(tenantId, deviceId);
           if (keys?.value?.length) {
             alert(`BitLocker Recovery Keys:\n\n${keys.value.map(k => k.id + ': ' + k.key).join('\n')}`);
           } else {
             Toast.show('No BitLocker keys found for this device', 'info');
           }
+          break;
+        }
+        case 'defenderScan': {
+          const quickScan = confirm(`Run a quick scan on ${name}?\n\nOK = Quick Scan\nCancel = Full Scan`);
+          await Graph.windowsDefenderScan(tenantId, deviceId, quickScan);
+          Toast.show(`Defender ${quickScan ? 'quick' : 'full'} scan initiated on ${name}`, 'success');
+          break;
+        }
+        case 'defenderUpdate':
+          await Graph.updateDefenderSignatures(tenantId, deviceId);
+          Toast.show(`Defender signature update initiated on ${name}`, 'success');
+          break;
+        case 'freshStart': {
+          if (!confirm(`Fresh Start ${name}? This will reinstall Windows and may remove apps.`)) return;
+          const keepUserData = confirm(`Keep user data on ${name}?\n\nOK = Keep user data\nCancel = Remove user data`);
+          await Graph.freshStart(tenantId, deviceId, keepUserData);
+          Toast.show(`Fresh Start initiated on ${name} (${keepUserData ? 'keeping' : 'removing'} user data)`, 'warning');
+          break;
+        }
+        case 'shutdown':
+          if (!confirm(`Shutdown ${name}?`)) return;
+          await Graph.shutdownDevice(tenantId, deviceId);
+          Toast.show(`Shutdown command sent to ${name}`, 'success');
+          break;
+        case 'collectDiags':
+          await Graph.collectDiagnostics(tenantId, deviceId);
+          Toast.show(`Diagnostics collection initiated on ${name}`, 'success');
+          break;
+        case 'locate':
+          await Graph.locateDevice(tenantId, deviceId);
+          Toast.show(`Locate request sent to ${name}`, 'success');
+          break;
+        case 'rotateFileVault':
+          await Graph.rotateFileVaultKey(tenantId, deviceId);
+          Toast.show(`FileVault key rotation initiated on ${name}`, 'success');
+          break;
+        case 'rotateBitlocker':
+          await Graph.rotateBitLockerKeys(tenantId, deviceId);
+          Toast.show(`BitLocker key rotation initiated on ${name}`, 'success');
           break;
       }
     } catch (error) {
@@ -398,10 +835,10 @@ const Devices = {
   exportCSV() {
     const allDevices = AppState.getDevicesForContext();
     const filtered = this.filterDevices(allDevices);
-    const headers = ['Device Name','Tenant','OS','OS Version','Compliance','User','Serial','Last Sync','Encrypted'];
+    const headers = ['Device Name','Tenant','OS','OS Version','Compliance','Managed By','User','Serial','Last Sync','Encrypted'];
     const rows = filtered.map(d => [
       d.deviceName, AppState.getTenantName(d._tenantId), d.operatingSystem, d.osVersion,
-      d.complianceState, d.userPrincipalName, d.serialNumber,
+      d.complianceState, d.managementAgent || '', d.userPrincipalName, d.serialNumber,
       d.lastSyncDateTime, d.isEncrypted ? 'Yes' : 'No'
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');

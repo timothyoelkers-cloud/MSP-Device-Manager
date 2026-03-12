@@ -244,5 +244,94 @@ const Graph = {
 
   async getDeviceCompliance(tenantId, deviceId) {
     return await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/deviceCompliancePolicyStates`);
+  },
+
+  // --- NEW DEVICE ACTIONS ---
+
+  async freshStart(tenantId, deviceId, keepUserData = false) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/cleanWindowsDevice`, {
+      method: 'POST', body: { keepUserData }
+    });
+  },
+
+  async windowsDefenderScan(tenantId, deviceId, quickScan = true) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/windowsDefenderScan`, {
+      method: 'POST', body: { quickScan }
+    });
+  },
+
+  async updateDefenderSignatures(tenantId, deviceId) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/windowsDefenderUpdateSignatures`, { method: 'POST' });
+  },
+
+  async collectDiagnostics(tenantId, deviceId) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/createDeviceLogCollectionRequest`, {
+      method: 'POST',
+      body: { templateType: { '@odata.type': '#microsoft.graph.deviceLogCollectionRequest' } },
+      beta: true
+    });
+  },
+
+  async shutdownDevice(tenantId, deviceId) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/shutDown`, { method: 'POST' });
+  },
+
+  async recoverPasscode(tenantId, deviceId) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/recoverPasscode`, { method: 'POST' });
+  },
+
+  async locateDevice(tenantId, deviceId) {
+    return await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/locateDevice`, { method: 'POST' });
+  },
+
+  async rotateFileVaultKey(tenantId, deviceId) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}/rotateFileVaultKey`, { method: 'POST', beta: true });
+  },
+
+  async updateDeviceNotes(tenantId, deviceId, notes) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}`, {
+      method: 'PATCH', body: { notes }
+    });
+  },
+
+  async getDeviceInstalledApps(tenantId, deviceId) {
+    return await this.callPaged(tenantId, `/deviceManagement/managedDevices/${deviceId}/detectedApps`);
+  },
+
+  async getDeviceConfigStates(tenantId, deviceId) {
+    return await this.callPaged(tenantId, `/deviceManagement/managedDevices/${deviceId}/deviceConfigurationStates`);
+  },
+
+  // --- POLICY CREATION ---
+
+  async createCompliancePolicy(tenantId, policy) {
+    return await this.call(tenantId, '/deviceManagement/deviceCompliancePolicies', {
+      method: 'POST', body: policy
+    });
+  },
+
+  async createConfigProfile(tenantId, profile) {
+    return await this.call(tenantId, '/deviceManagement/deviceConfigurations', {
+      method: 'POST', body: profile
+    });
+  },
+
+  async assignPolicy(tenantId, policyId, policyType, groupIds) {
+    const assignments = groupIds.map(gid => ({
+      target: { '@odata.type': '#microsoft.graph.groupAssignmentTarget', groupId: gid }
+    }));
+    const endpoint = policyType === 'compliance'
+      ? `/deviceManagement/deviceCompliancePolicies/${policyId}/assign`
+      : `/deviceManagement/deviceConfigurations/${policyId}/assign`;
+    return await this.call(tenantId, endpoint, {
+      method: 'POST', body: { assignments }
+    });
+  },
+
+  async deletePolicy(tenantId, policyId, policyType) {
+    const endpoint = policyType === 'compliance'
+      ? `/deviceManagement/deviceCompliancePolicies/${policyId}`
+      : `/deviceManagement/deviceConfigurations/${policyId}`;
+    return await this.call(tenantId, endpoint, { method: 'DELETE' });
   }
 };

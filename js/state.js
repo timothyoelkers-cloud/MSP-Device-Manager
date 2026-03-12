@@ -168,3 +168,82 @@ const Toast = {
     }, duration);
   }
 };
+
+/* --- Skeleton Loading States --- */
+const Skeleton = {
+  // Returns HTML for a skeleton card grid (n cards)
+  cards(n = 4) {
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:16px 0;">';
+    for (let i = 0; i < n; i++) {
+      html += `
+        <div class="skeleton skeleton-card" style="padding:20px;height:auto;min-height:120px;display:flex;flex-direction:column;gap:12px;">
+          <div class="skeleton skeleton-title" style="width:${50 + Math.random() * 30}%"></div>
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton skeleton-text" style="width:60%"></div>
+        </div>`;
+    }
+    html += '</div>';
+    return html;
+  },
+
+  // Returns HTML for a skeleton table (n rows, cols columns)
+  table(n = 5, cols = 6) {
+    let html = '<div style="padding:16px 0;"><div class="skeleton skeleton-title" style="margin-bottom:16px;"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+    // Header row
+    html += '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">';
+    for (let c = 0; c < cols; c++) {
+      html += `<div class="skeleton skeleton-text" style="flex:1;height:16px;width:auto;margin:0;"></div>`;
+    }
+    html += '</div>';
+    // Data rows
+    for (let r = 0; r < n; r++) {
+      html += '<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      for (let c = 0; c < cols; c++) {
+        html += `<div class="skeleton skeleton-text" style="flex:1;height:14px;width:auto;margin:0;"></div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+    return html;
+  },
+
+  // Returns HTML for skeleton stat cards (n cards)
+  stats(n = 4) {
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;padding:16px 0;">';
+    for (let i = 0; i < n; i++) {
+      html += `
+        <div class="skeleton skeleton-card" style="padding:20px;height:auto;min-height:90px;display:flex;flex-direction:column;gap:10px;">
+          <div class="skeleton skeleton-text" style="width:50%;height:12px;"></div>
+          <div class="skeleton skeleton-title" style="width:35%;height:32px;margin-bottom:0;"></div>
+          <div class="skeleton skeleton-text" style="width:70%;height:10px;"></div>
+        </div>`;
+    }
+    html += '</div>';
+    return html;
+  },
+
+  // Returns HTML for a single skeleton detail section
+  detail() {
+    return `
+      <div style="padding:16px 0;display:flex;flex-direction:column;gap:16px;">
+        <div class="skeleton skeleton-title" style="width:60%;"></div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="skeleton skeleton-avatar"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+            <div class="skeleton skeleton-text" style="width:40%;"></div>
+            <div class="skeleton skeleton-text" style="width:25%;"></div>
+          </div>
+        </div>
+        <div class="skeleton skeleton-card" style="height:80px;"></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton skeleton-text" style="width:75%;"></div>
+          <div class="skeleton skeleton-text" style="width:50%;"></div>
+        </div>
+        <div class="skeleton skeleton-card" style="height:60px;"></div>
+      </div>`;
+  }
+};
