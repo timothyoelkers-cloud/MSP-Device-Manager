@@ -70,6 +70,11 @@
           <span class="tenant-arrow">&#9662;</span>
         </div>
 
+        <!-- Dark Mode Toggle -->
+        <button class="topbar-btn" data-tooltip="Toggle Dark Mode" id="darkModeToggle" onclick="toggleDarkMode()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="darkModeIcon"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+
         <!-- Notifications -->
         <button class="topbar-btn" data-tooltip="Notifications" onclick="toggleNotifications()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -195,6 +200,118 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
               </span>
               Groups
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Identity & Access</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="users" onclick="Router.navigate('users')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              Users
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="conditionalaccess" onclick="Router.navigate('conditionalaccess')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+              </span>
+              Conditional Access
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="appprotection" onclick="Router.navigate('appprotection')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v4l3 3"/></svg>
+              </span>
+              App Protection
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Security & Compliance</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="baselines" onclick="Router.navigate('baselines')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+              </span>
+              Security Baselines
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="enrollment" onclick="Router.navigate('enrollment')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+              </span>
+              Enrollment
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="scripts" onclick="Router.navigate('scripts')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </span>
+              Remediations
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Multi-Tenant</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="templates" onclick="Router.navigate('templates')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+              </span>
+              Policy Templates
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="comparison" onclick="Router.navigate('comparison')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              </span>
+              Tenant Compare
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="alerts" onclick="Router.navigate('alerts')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+              </span>
+              Alerts
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="reports" onclick="Router.navigate('reports')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </span>
+              Reports
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="auditlog" onclick="Router.navigate('auditlog')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </span>
+              Audit Log
             </a>
           </li>
         </ul>
@@ -355,6 +472,17 @@
   <script src="js/autopilot.js"></script>
   <script src="js/updates.js"></script>
   <script src="js/groups.js"></script>
+  <script src="js/users.js"></script>
+  <script src="js/reports.js"></script>
+  <script src="js/alerts.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/scripts.js"></script>
+  <script src="js/conditionalaccess.js"></script>
+  <script src="js/appprotection.js"></script>
+  <script src="js/enrollment.js"></script>
+  <script src="js/baselines.js"></script>
+  <script src="js/auditlog.js"></script>
+  <script src="js/comparison.js"></script>
   <script src="js/licensing.js"></script>
   <script src="js/sponsor.js"></script>
   <script src="js/dashboard.js"></script>
@@ -407,6 +535,33 @@
     function toggleNotifications() {
       Toast.show('No new notifications', 'info');
     }
+
+    // Dark Mode
+    function toggleDarkMode() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const newTheme = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('msp_theme', newTheme);
+      const icon = document.getElementById('darkModeIcon');
+      if (icon) {
+        icon.innerHTML = newTheme === 'dark'
+          ? '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
+          : '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+      }
+    }
+
+    // Restore dark mode preference
+    (function() {
+      const saved = localStorage.getItem('msp_theme');
+      if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        // Update icon after DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+          const icon = document.getElementById('darkModeIcon');
+          if (icon) icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+        });
+      }
+    })();
 
     // Initialize app after gate
     window.addEventListener('DOMContentLoaded', async () => {

@@ -90,6 +90,12 @@ const Graph = {
       this.loadAutopilotDevices(tenantId),
       this.loadUpdateRings(tenantId),
       this.loadGroups(tenantId),
+      this.loadUsers(tenantId),
+      this.loadCAPolicies(tenantId),
+      this.loadAppProtectionPolicies(tenantId),
+      this.loadEnrollmentConfigs(tenantId),
+      this.loadSecurityBaselines(tenantId),
+      this.loadHealthScripts(tenantId),
     ];
 
     const results = await Promise.allSettled(loaders);
@@ -413,5 +419,95 @@ const Graph = {
 
   async deleteUpdateRing(tenantId, ringId) {
     return await this.call(tenantId, `/deviceManagement/deviceConfigurations/${ringId}`, { method: 'DELETE' });
+  },
+
+  // === NEW MODULE LOADERS ===
+
+  // Load users
+  async loadUsers(tenantId) {
+    AppState.setLoading('users', true);
+    try {
+      const users = await this.callPaged(tenantId, '/users?$top=100&$select=id,displayName,userPrincipalName,mail,accountEnabled,assignedLicenses,jobTitle,department,createdDateTime,signInActivity');
+      const cache = { ...AppState.get('users') };
+      cache[tenantId] = users;
+      AppState.set('users', cache);
+    } finally {
+      AppState.setLoading('users', false);
+    }
+  },
+
+  // Get user's managed devices
+  async getUserDevices(tenantId, userId) {
+    return await this.callPaged(tenantId, `/users/${userId}/managedDevices?$select=id,deviceName,operatingSystem,complianceState,lastSyncDateTime`);
+  },
+
+  // Load Conditional Access policies
+  async loadCAPolicies(tenantId) {
+    AppState.setLoading('caPolicies', true);
+    try {
+      const policies = await this.callPaged(tenantId, '/identity/conditionalAccess/policies');
+      const cache = { ...AppState.get('caPolicies') };
+      cache[tenantId] = policies;
+      AppState.set('caPolicies', cache);
+    } finally {
+      AppState.setLoading('caPolicies', false);
+    }
+  },
+
+  // Load App Protection (MAM) policies
+  async loadAppProtectionPolicies(tenantId) {
+    AppState.setLoading('appProtectionPolicies', true);
+    try {
+      const policies = await this.callPaged(tenantId, '/deviceAppManagement/managedAppPolicies');
+      const cache = { ...AppState.get('appProtectionPolicies') };
+      cache[tenantId] = policies;
+      AppState.set('appProtectionPolicies', cache);
+    } finally {
+      AppState.setLoading('appProtectionPolicies', false);
+    }
+  },
+
+  // Load Enrollment configurations
+  async loadEnrollmentConfigs(tenantId) {
+    AppState.setLoading('enrollmentConfigs', true);
+    try {
+      const configs = await this.callPaged(tenantId, '/deviceManagement/deviceEnrollmentConfigurations');
+      const cache = { ...AppState.get('enrollmentConfigs') };
+      cache[tenantId] = configs;
+      AppState.set('enrollmentConfigs', cache);
+    } finally {
+      AppState.setLoading('enrollmentConfigs', false);
+    }
+  },
+
+  // Load Security Baselines (beta endpoint)
+  async loadSecurityBaselines(tenantId) {
+    AppState.setLoading('securityBaselines', true);
+    try {
+      const baselines = await this.callPaged(tenantId, '/deviceManagement/templates', { beta: true });
+      const cache = { ...AppState.get('securityBaselines') };
+      cache[tenantId] = baselines;
+      AppState.set('securityBaselines', cache);
+    } finally {
+      AppState.setLoading('securityBaselines', false);
+    }
+  },
+
+  // Load Device Health Scripts (Remediations)
+  async loadHealthScripts(tenantId) {
+    AppState.setLoading('healthScripts', true);
+    try {
+      const scripts = await this.callPaged(tenantId, '/deviceManagement/deviceHealthScripts', { beta: true });
+      const cache = { ...AppState.get('healthScripts') };
+      cache[tenantId] = scripts;
+      AppState.set('healthScripts', cache);
+    } finally {
+      AppState.setLoading('healthScripts', false);
+    }
+  },
+
+  // Get remediation script run history
+  async getScriptRunHistory(tenantId, scriptId) {
+    return await this.callPaged(tenantId, `/deviceManagement/deviceHealthScripts/${scriptId}/deviceRunStates`, { beta: true });
   },
 };

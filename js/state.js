@@ -29,6 +29,12 @@ const AppState = {
     autopilotDevices: {},
     updateRings: {},
     groups: {},
+    users: {},
+    caPolicies: {},
+    appProtectionPolicies: {},
+    enrollmentConfigs: {},
+    securityBaselines: {},
+    healthScripts: {},
 
     // UI state
     currentPage: 'dashboard',

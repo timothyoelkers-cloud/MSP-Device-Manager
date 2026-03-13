@@ -32,6 +32,9 @@ const Auth = {
     'BitLockerKey.Read.All',
     'InformationProtectionPolicy.Read',
     'WindowsUpdates.ReadWrite.All',
+    'Policy.Read.All',
+    'AuditLog.Read.All',
+    'User.ReadBasic.All',
   ],
 
   // Partner Center scopes for GDAP
