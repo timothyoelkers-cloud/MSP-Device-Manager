@@ -293,6 +293,24 @@
             Connect via Partner Center (GDAP - All Tenants)
           </button>
           <p class="text-xs text-muted text-center" style="margin-top: 8px;">Partner Center connection requires CSP partner credentials with GDAP relationships configured.</p>
+
+          <div style="border-top: 1px solid var(--border-light); padding-top: 12px; margin-top: 4px;">
+            <p class="text-xs text-muted" style="margin-bottom: 8px;">
+              <strong>Customer tenant not working?</strong> The customer's Global Admin must grant consent for this app.
+              Send them this link:
+            </p>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" class="form-input" id="adminConsentUrl" readonly
+                value="https://login.microsoftonline.com/common/adminconsent?client_id=7a20ef88-2e8f-4ea1-8ed0-79df7ae259b8&redirect_uri=https://timothyoelkers-cloud.github.io/MSP-Device-Manager/"
+                style="font-size:11px; padding:6px 8px; flex:1; cursor:text;">
+              <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('adminConsentUrl').value); Toast.show('Admin consent URL copied!', 'success');">
+                Copy
+              </button>
+            </div>
+            <p class="text-xs text-muted" style="margin-top: 6px;">
+              Once they approve, reconnect the tenant here and all permissions will be active.
+            </p>
+          </div>
         </div>
       </div>
     </div>
