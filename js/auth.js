@@ -42,6 +42,28 @@ const Auth = {
   msalInstance: null,
   msalReady: false,
 
+  // Compute a fingerprint of the current scopes to detect changes
+  _scopeFingerprint() {
+    return this.graphScopes.slice().sort().join('|');
+  },
+
+  // Check if scopes have changed since last consent
+  _needsReconsent() {
+    const current = this._scopeFingerprint();
+    const stored = localStorage.getItem('msp_scope_fingerprint');
+    return stored !== null && stored !== current;
+  },
+
+  // Mark scopes as consented
+  _markScopesConsented() {
+    localStorage.setItem('msp_scope_fingerprint', this._scopeFingerprint());
+  },
+
+  // Get the appropriate login prompt — 'consent' if scopes changed, otherwise 'select_account'
+  _getLoginPrompt() {
+    return this._needsReconsent() ? 'consent' : 'select_account';
+  },
+
   async init() {
     try {
       // MSAL v3 requires async createPublicClientApplication
@@ -57,6 +79,13 @@ const Auth = {
       }
       this.msalReady = true;
       console.log('MSAL initialized successfully');
+
+      // Check if scopes changed — if so, clear cached tokens and prompt for reconsent
+      if (this._needsReconsent()) {
+        console.log('API scopes have changed — will prompt for reconsent on next login');
+        // Clear stale tokens that don't have new permissions
+        AppState.set('accessTokens', {});
+      }
     } catch (e) {
       console.error('MSAL init failed:', e);
       this.msalReady = false;
@@ -77,12 +106,20 @@ const Auth = {
       return;
     }
     try {
+      const loginPrompt = this._getLoginPrompt();
+      if (loginPrompt === 'consent') {
+        Toast.show('Permissions have been updated — you\'ll be asked to approve new access rights.', 'info', 'Permissions Updated');
+      }
+
       const result = await this.msalInstance.loginPopup({
         scopes: this.graphScopes,
-        prompt: 'select_account'
+        prompt: loginPrompt
       });
 
       if (result?.account) {
+        // Mark scopes as consented so we don't re-prompt next time
+        this._markScopesConsented();
+
         AppState.set('isAuthenticated', true);
         AppState.set('authMode', 'single');
         AppState.set('account', {
@@ -352,35 +389,45 @@ const Auth = {
     this._reconnectShown = false;
     document.getElementById('reconnectBanner')?.remove();
 
+    const needsReconsent = this._needsReconsent();
+
     try {
-      const accounts = this.msalInstance?.getAllAccounts() || [];
-      if (accounts.length > 0) {
-        // Try silent first with popup fallback
-        const tokenRequest = {
-          scopes: this.graphScopes,
-          account: accounts[0],
-          prompt: 'none'
-        };
-        try {
-          const result = await this.msalInstance.acquireTokenSilent(tokenRequest);
-          if (result?.accessToken) {
-            Toast.show('Session restored. Reloading data...', 'success');
-            this._reloadAllTenantData();
-            this._isUserInitiated = false;
-            return;
+      // Only try silent if scopes haven't changed (otherwise we need consent)
+      if (!needsReconsent) {
+        const accounts = this.msalInstance?.getAllAccounts() || [];
+        if (accounts.length > 0) {
+          const tokenRequest = {
+            scopes: this.graphScopes,
+            account: accounts[0],
+          };
+          try {
+            const result = await this.msalInstance.acquireTokenSilent(tokenRequest);
+            if (result?.accessToken) {
+              Toast.show('Session restored. Reloading data...', 'success');
+              this._reloadAllTenantData();
+              this._isUserInitiated = false;
+              return;
+            }
+          } catch {
+            // Silent failed, fall through to popup
           }
-        } catch {
-          // Silent failed, try popup
         }
       }
 
-      // Full re-login via popup
+      // Full re-login via popup (consent if scopes changed)
+      const loginPrompt = needsReconsent ? 'consent' : 'select_account';
+      if (needsReconsent) {
+        Toast.show('Permissions updated — please approve new access rights.', 'info', 'Permissions Updated');
+      }
+
       const result = await this.msalInstance.loginPopup({
         scopes: this.graphScopes,
-        prompt: 'select_account'
+        prompt: loginPrompt
       });
 
       if (result?.account) {
+        this._markScopesConsented();
+
         AppState.set('isAuthenticated', true);
         AppState.set('account', {
           name: result.account.name,
