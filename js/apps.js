@@ -159,7 +159,7 @@ const Apps = {
         <tbody>
           ${apps.length === 0 ? `
             <tr><td colspan="${isAll ? 7 : 6}" class="text-center text-muted" style="padding:3rem;">
-              ${AppState.get('tenants').length === 0 ? 'Connect a tenant to view managed apps.' : 'No apps match your filters.'}
+              ${AppState.get('tenants').length === 0 ? 'Connect a tenant to view managed apps.' : (AppState.isLoading('apps') ? 'Loading applications...' : (this.searchTerm || this.typeFilter !== 'all' || this.stateFilter !== 'all' ? 'No apps match your filters.' : 'No applications found. Data may still be loading — try refreshing.'))}
             </td></tr>
           ` : apps.map(a => `
             <tr style="cursor:pointer;" onclick="Apps.showDetail('${a._tenantId}','${a.id}')">
@@ -333,7 +333,12 @@ const Apps = {
   showDeployModal() {
     const apps = AppState.getForContext('apps');
     if (!apps.length) {
-      Toast.show('No apps available to deploy. Connect a tenant first.', 'warning');
+      const tenants = AppState.get('tenants');
+      if (tenants.length === 0) {
+        Toast.show('No apps available. Connect a tenant first.', 'warning');
+      } else {
+        Toast.show('App data is still loading. Please wait a moment and try again.', 'info');
+      }
       return;
     }
     const modal = document.getElementById('deployAppModal');

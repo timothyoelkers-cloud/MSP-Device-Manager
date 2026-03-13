@@ -391,9 +391,33 @@
     }
 
     // Initialize app after gate
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
       if (sessionStorage.getItem('msp_gate_passed') === '1') {
         Router.init();
+
+        // Auto-reload data for persisted tenants after auth is ready
+        const tenants = AppState.get('tenants');
+        if (tenants.length > 0) {
+          const ready = await Auth.ensureReady();
+          if (ready && Auth.msalInstance) {
+            const accounts = Auth.msalInstance.getAllAccounts();
+            if (accounts.length > 0) {
+              // We have a cached MSAL session — restore auth state and reload data
+              AppState.set('isAuthenticated', true);
+              AppState.set('account', {
+                name: accounts[0].name,
+                username: accounts[0].username,
+                tenantId: accounts[0].tenantId
+              });
+              Auth.updateUI();
+              Auth.updateTenantSelectors();
+              // Reload data for all connected tenants
+              for (const t of tenants) {
+                Graph.loadAllData(t.id).catch(() => {});
+              }
+            }
+          }
+        }
       }
     });
   </script>
