@@ -277,7 +277,7 @@ const Devices = {
     document.getElementById('detailDeviceName').textContent = device.deviceName || 'Device Details';
 
     body.innerHTML = this._renderDetailTabs(device, tenantId, deviceId);
-    actions.innerHTML = this._renderDetailActionsGrid(tenantId, deviceId, device);
+    actions.innerHTML = '';
 
     panel.classList.add('open');
   },
@@ -300,6 +300,7 @@ const Devices = {
         <button class="tab" data-tab="apps" onclick="Devices.switchDetailTab('apps', this)">Apps</button>
         <button class="tab" data-tab="config" onclick="Devices.switchDetailTab('config', this)">Config</button>
         <button class="tab" data-tab="notes" onclick="Devices.switchDetailTab('notes', this)">Notes</button>
+        <button class="tab" data-tab="actions" onclick="Devices.switchDetailTab('actions', this)">Actions</button>
       </div>
 
       <!-- Overview Tab -->
@@ -419,6 +420,11 @@ const Devices = {
             <button class="btn btn-secondary btn-sm" onclick="Devices.saveNotes('${tenantId}','${deviceId}')">Save Notes</button>
           </div>
         </div>
+      </div>
+
+      <!-- Actions Tab -->
+      <div class="detail-tab-content" id="detailTab-actions" style="display:none;">
+        ${this._renderDetailActionsGrid(tenantId, deviceId, device)}
       </div>
     `;
   },
@@ -544,110 +550,61 @@ const Devices = {
     }
   },
 
-  // Detail panel actions grid - categorized
+  // Detail panel actions grid - compact 4-column layout
   _renderDetailActionsGrid(tenantId, deviceId, device) {
     const isMac = (device.operatingSystem || '').toLowerCase().includes('mac');
     const isWindows = (device.operatingSystem || '').toLowerCase().includes('windows');
     const t = tenantId;
     const d = deviceId;
 
+    const actions = [
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>', label: 'Sync', onclick: `Devices.action('sync','${t}','${d}')`, color: '' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>', label: 'Diagnostics', onclick: `Devices.action('collectDiags','${t}','${d}')`, color: '' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>', label: 'Locate', onclick: `Devices.action('locate','${t}','${d}')`, color: '' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', label: 'Defender Scan', onclick: `Devices.action('defenderScan','${t}','${d}')`, color: '' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>', label: 'Update Sigs', onclick: `Devices.action('defenderUpdate','${t}','${d}')`, color: '' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>', label: 'Rename', onclick: `Devices.action('rename','${t}','${d}')`, color: '' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>', label: 'Restart', onclick: `Devices.action('restart','${t}','${d}')`, color: 'orange' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>', label: 'Shutdown', onclick: `Devices.action('shutdown','${t}','${d}')`, color: 'orange' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>', label: 'Lock', onclick: `Devices.action('lock','${t}','${d}')`, color: 'orange' },
+    ];
+
+    // Platform-specific actions
+    if (isWindows) {
+      actions.push(
+        { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>', label: 'Rotate BitLocker', onclick: `Devices.action('rotateBitlocker','${t}','${d}')`, color: '' },
+        { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>', label: 'BitLocker Keys', onclick: `Devices.action('bitlocker','${t}','${d}')`, color: '' }
+      );
+    }
+    if (isMac) {
+      actions.push(
+        { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>', label: 'Rotate FileVault', onclick: `Devices.action('rotateFileVault','${t}','${d}')`, color: '' }
+      );
+    }
+
+    // Destructive actions always last
+    actions.push(
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>', label: 'Retire', onclick: `Devices.action('retire','${t}','${d}')`, color: 'red' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>', label: 'Wipe', onclick: `Devices.action('wipe','${t}','${d}')`, color: 'red' },
+      { icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6"/><path d="M2.66 15.57a10 10 0 10.57-8.38"/></svg>', label: 'Fresh Start', onclick: `Devices.action('freshStart','${t}','${d}')`, color: 'red' }
+    );
+
     return `
-      <div class="detail-actions" style="display:flex;flex-direction:column;gap:16px;">
-        <!-- Sync & Monitor -->
-        <div>
-          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--ink-tertiary);">Sync & Monitor</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;">
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('sync','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-              Sync
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        ${actions.map(a => {
+          const borderColor = a.color === 'red' ? 'var(--danger)' : a.color === 'orange' ? 'var(--warning)' : 'var(--border)';
+          const textColor = a.color === 'red' ? 'var(--danger)' : a.color === 'orange' ? 'var(--warning)' : 'var(--ink-secondary)';
+          const bgHover = a.color === 'red' ? 'var(--danger-pale)' : a.color === 'orange' ? 'var(--warning-pale)' : 'var(--gray-50)';
+          return `
+            <button class="detail-action-btn" onclick="${a.onclick}"
+                    style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border:1px solid ${borderColor};border-radius:8px;background:var(--surface);cursor:pointer;transition:all 0.15s ease;color:${textColor};font-size:11px;font-weight:500;font-family:inherit;line-height:1.2;text-align:center;"
+                    onmouseover="this.style.background='${bgHover}'"
+                    onmouseout="this.style.background='var(--surface)'">
+              ${a.icon}
+              ${a.label}
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('collectDiags','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              Collect Diagnostics
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('locate','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              Locate
-            </button>
-          </div>
-        </div>
-
-        <!-- Security -->
-        <div>
-          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--ink-tertiary);">Security</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;">
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('defenderScan','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              Defender Scan
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('defenderUpdate','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-              Update Signatures
-            </button>
-            ${isWindows ? `
-              <button class="btn btn-secondary btn-sm" onclick="Devices.action('rotateBitlocker','${t}','${d}')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                Rotate BitLocker
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="Devices.action('bitlocker','${t}','${d}')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-                BitLocker Keys
-              </button>
-            ` : ''}
-            ${isMac ? `
-              <button class="btn btn-secondary btn-sm" onclick="Devices.action('rotateFileVault','${t}','${d}')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                Rotate FileVault
-              </button>
-            ` : ''}
-          </div>
-        </div>
-
-        <!-- Power -->
-        <div>
-          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--ink-tertiary);">Power</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;">
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('restart','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-              Restart
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('shutdown','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-              Shutdown
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="Devices.action('lock','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-              Lock
-            </button>
-          </div>
-        </div>
-
-        <!-- Destructive -->
-        <div>
-          <div class="detail-section-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;color:var(--danger);">Destructive</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;">
-            <button class="btn btn-danger btn-sm" onclick="Devices.action('retire','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-              Retire
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="Devices.action('wipe','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
-              Wipe
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="Devices.action('freshStart','${t}','${d}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6"/><path d="M2.66 15.57a10 10 0 10.57-8.38"/></svg>
-              Fresh Start
-            </button>
-          </div>
-        </div>
-
-        <!-- Rename dropdown at bottom -->
-        <div style="border-top:1px solid var(--border);padding-top:12px;">
-          <button class="btn btn-secondary btn-sm" onclick="Devices.action('rename','${t}','${d}')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Rename Device
-          </button>
-        </div>
+          `;
+        }).join('')}
       </div>
     `;
   },

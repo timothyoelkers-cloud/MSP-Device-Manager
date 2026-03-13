@@ -333,5 +333,57 @@ const Graph = {
       ? `/deviceManagement/deviceCompliancePolicies/${policyId}`
       : `/deviceManagement/deviceConfigurations/${policyId}`;
     return await this.call(tenantId, endpoint, { method: 'DELETE' });
-  }
+  },
+
+  // --- APP MANAGEMENT ---
+
+  async getAppAssignments(tenantId, appId) {
+    return await this.call(tenantId, `/deviceAppManagement/mobileApps/${appId}/assignments`);
+  },
+
+  async getAppDeviceStatuses(tenantId, appId) {
+    return await this.callPaged(tenantId, `/deviceAppManagement/mobileApps/${appId}/deviceStatuses`, { beta: true });
+  },
+
+  async assignApp(tenantId, appId, assignments) {
+    return await this.call(tenantId, `/deviceAppManagement/mobileApps/${appId}/assign`, {
+      method: 'POST',
+      body: { mobileAppAssignments: assignments }
+    });
+  },
+
+  async removeAppAssignment(tenantId, appId, assignmentId) {
+    return await this.call(tenantId, `/deviceAppManagement/mobileApps/${appId}/assignments/${assignmentId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // --- WINDOWS UPDATES ---
+
+  async getWindowsUpdateStates(tenantId) {
+    return await this.callPaged(tenantId, '/deviceManagement/managedDevices?$select=id,deviceName,osVersion,lastSyncDateTime,complianceState&$filter=operatingSystem eq \'Windows\'');
+  },
+
+  async getWindowsFeatureUpdates(tenantId) {
+    return await this.callPaged(tenantId, '/deviceManagement/windowsFeatureUpdateProfiles', { beta: true });
+  },
+
+  async getWindowsQualityUpdates(tenantId) {
+    return await this.callPaged(tenantId, '/deviceManagement/windowsQualityUpdateProfiles', { beta: true });
+  },
+
+  async getWindowsDriverUpdates(tenantId) {
+    return await this.callPaged(tenantId, '/deviceManagement/windowsDriverUpdateProfiles', { beta: true });
+  },
+
+  async createUpdateRing(tenantId, ring) {
+    return await this.call(tenantId, '/deviceManagement/deviceConfigurations', {
+      method: 'POST',
+      body: { ...ring, '@odata.type': '#microsoft.graph.windowsUpdateForBusinessConfiguration' }
+    });
+  },
+
+  async deleteUpdateRing(tenantId, ringId) {
+    return await this.call(tenantId, `/deviceManagement/deviceConfigurations/${ringId}`, { method: 'DELETE' });
+  },
 };

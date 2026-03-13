@@ -820,6 +820,10 @@
   border-radius: var(--radius-full);
   border: 1px solid var(--border-light);
 }
+.chip-active {
+  background: var(--primary);
+  color: var(--white);
+}
 .chip-remove {
   cursor: pointer;
   font-size: 12px;
@@ -1019,7 +1023,7 @@
   top: var(--topbar-h);
   right: 0;
   bottom: 0;
-  width: 480px;
+  width: 620px;
   max-width: 90vw;
   background: var(--surface);
   border-left: 1px solid var(--border);
@@ -1081,12 +1085,6 @@
 }
 
 .detail-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--sp-2);
-  padding: var(--sp-4) var(--sp-5);
-  border-top: 1px solid var(--border-light);
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
+  padding: 0;
+  border-top: none;
 }
