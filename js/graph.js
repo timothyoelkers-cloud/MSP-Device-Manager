@@ -182,6 +182,10 @@ const Graph = {
       const cache = { ...AppState.get('apps') };
       cache[tenantId] = apps;
       AppState.set('apps', cache);
+      console.log(`Loaded ${apps.length} apps for tenant ${tenantId}`);
+    } catch (err) {
+      console.error(`Failed to load apps for ${tenantId}:`, err.message);
+      throw err; // Re-throw so loadAllData records this failure
     } finally {
       AppState.setLoading('apps', false);
     }

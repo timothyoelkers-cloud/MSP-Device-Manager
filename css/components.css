@@ -609,28 +609,67 @@
 }
 
 /* --- Tabs --- */
+/* --- Modern Tab Bar --- */
 .tabs {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
-  border-bottom: 1px solid var(--border);
+  background: var(--gray-50);
+  border-radius: var(--radius-lg);
+  padding: 3px;
   margin-bottom: var(--sp-5);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--ink-tertiary);
-  border-bottom: 2px solid transparent;
+  border: none;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--duration) var(--ease);
   white-space: nowrap;
+  background: transparent;
+  position: relative;
+  line-height: 1.5;
 }
-.tab:hover { color: var(--ink-secondary); }
+.tab:hover {
+  color: var(--ink-secondary);
+  background: rgba(0,0,0,0.04);
+}
 .tab.active {
   color: var(--primary);
-  border-bottom-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
   font-weight: 600;
+}
+
+/* Underline variant for inline/wizard tabs */
+.tabs--underline {
+  background: transparent;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  gap: 0;
+}
+.tabs--underline .tab {
+  border-radius: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs--underline .tab:hover {
+  background: transparent;
+  color: var(--ink-secondary);
+}
+.tabs--underline .tab.active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--primary);
+  border-bottom-color: var(--primary);
 }
 
 /* --- Toggle / Switch --- */

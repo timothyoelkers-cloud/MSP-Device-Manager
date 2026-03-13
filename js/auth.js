@@ -21,6 +21,7 @@ const Auth = {
   graphScopes: [
     'User.Read',
     'DeviceManagementManagedDevices.ReadWrite.All',
+    'DeviceManagementManagedDevices.PrivilegedOperations.All',
     'DeviceManagementConfiguration.ReadWrite.All',
     'DeviceManagementApps.ReadWrite.All',
     'DeviceManagementServiceConfig.ReadWrite.All',
@@ -28,6 +29,9 @@ const Auth = {
     'Directory.Read.All',
     'Group.ReadWrite.All',
     'GroupMember.ReadWrite.All',
+    'BitLockerKey.Read.All',
+    'InformationProtectionPolicy.Read',
+    'WindowsUpdates.ReadWrite.All',
   ],
 
   // Partner Center scopes for GDAP

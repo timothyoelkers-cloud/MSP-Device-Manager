@@ -12,6 +12,21 @@ const Apps = {
 
   render() {
     const main = document.getElementById('mainContent');
+
+    // Show skeleton if actively loading
+    if (AppState.isLoading('apps') && AppState.getForContext('apps').length === 0) {
+      main.innerHTML = `
+        <div class="page-header">
+          <div class="page-header-left">
+            <h1 class="page-title">Applications</h1>
+            <p class="page-subtitle">Loading applications...</p>
+          </div>
+        </div>
+        ${Skeleton.table(8, 6)}
+      `;
+      return;
+    }
+
     const apps = AppState.getForContext('apps');
     const isAll = AppState.get('activeTenant') === 'all';
     const filtered = this.filterApps(apps);

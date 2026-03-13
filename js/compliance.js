@@ -557,7 +557,7 @@ const Compliance = {
           </div>
 
           <!-- Step indicators -->
-          <div class="tabs" style="padding:0 1.5rem;">
+          <div class="tabs tabs--underline" style="padding:0 1.5rem;">
             ${steps.map((s, i) => `
               <button class="tab ${ws.step === i + 1 ? 'active' : ''}" ${i + 1 < ws.step ? `onclick="Compliance.wizardGoTo(${i + 1})"` : ''} style="pointer-events:${i + 1 < ws.step ? 'auto' : 'none'};">
                 <span class="badge ${ws.step === i + 1 ? 'badge-blue' : (i + 1 < ws.step ? 'badge-green' : 'badge-default')}" style="margin-right:0.35rem;">${i + 1}</span>
