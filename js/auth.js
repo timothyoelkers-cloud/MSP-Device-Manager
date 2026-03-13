@@ -51,7 +51,8 @@ const Auth = {
   _needsReconsent() {
     const current = this._scopeFingerprint();
     const stored = localStorage.getItem('msp_scope_fingerprint');
-    return stored !== null && stored !== current;
+    // Force consent if: no fingerprint stored yet, OR fingerprint doesn't match
+    return stored !== current;
   },
 
   // Mark scopes as consented
