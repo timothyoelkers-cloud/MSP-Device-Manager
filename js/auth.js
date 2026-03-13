@@ -227,43 +227,193 @@ const Auth = {
     }
   },
 
+  // Track whether we've already shown the reconnect banner
+  _reconnectShown: false,
+  _tokenFailures: 0,
+
   // Acquire a delegated token for a specific tenant (GDAP)
   async acquireTokenForTenant(tenantId) {
     if (!(await this.ensureReady())) return null;
+
+    const accounts = this.msalInstance.getAllAccounts();
+    if (!accounts.length) {
+      console.warn('No MSAL accounts cached — session expired');
+      this._showReconnectBanner('Your session has expired. Please reconnect to continue.');
+      return null;
+    }
+
     try {
       const tokenRequest = {
         scopes: this.graphScopes,
         authority: `https://login.microsoftonline.com/${tenantId}`,
-        account: this.msalInstance.getAllAccounts()[0]
+        account: accounts[0]
       };
 
       let result;
       try {
         result = await this.msalInstance.acquireTokenSilent(tokenRequest);
-      } catch {
-        result = await this.msalInstance.acquireTokenPopup(tokenRequest);
+      } catch (silentErr) {
+        console.warn(`Silent token failed for ${tenantId}:`, silentErr.message);
+        // Only try popup if user-initiated (not during auto-reload)
+        if (this._isUserInitiated) {
+          try {
+            result = await this.msalInstance.acquireTokenPopup(tokenRequest);
+          } catch (popupErr) {
+            console.warn(`Popup token failed for ${tenantId}:`, popupErr.message);
+          }
+        }
       }
 
       if (result?.accessToken) {
         const tokens = { ...AppState.get('accessTokens') };
         tokens[tenantId] = result.accessToken;
         AppState.set('accessTokens', tokens);
+        this._tokenFailures = 0;
         return result.accessToken;
       }
     } catch (error) {
       console.warn(`Token acquisition failed for tenant ${tenantId}:`, error.message);
     }
+
+    // Token acquisition failed
+    this._tokenFailures++;
+    if (this._tokenFailures >= 1) {
+      this._showReconnectBanner('Could not refresh your session. Please reconnect to load data.');
+    }
     return null;
   },
 
-  // Get access token for a tenant
+  // Get access token for a tenant (with expiry check)
   async getToken(tenantId) {
     let token = AppState.get('accessTokens')[tenantId];
+
+    // Check if token is expired (JWT exp claim)
+    if (token && this._isTokenExpired(token)) {
+      console.log(`Token expired for tenant ${tenantId}, refreshing...`);
+      const tokens = { ...AppState.get('accessTokens') };
+      delete tokens[tenantId];
+      AppState.set('accessTokens', tokens);
+      token = null;
+    }
+
     if (!token) {
       token = await this.acquireTokenForTenant(tenantId);
     }
     return token;
   },
+
+  // Check if a JWT token is expired
+  _isTokenExpired(token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      // Consider expired if within 5 minutes of expiry
+      return payload.exp && (payload.exp * 1000) < (Date.now() + 5 * 60 * 1000);
+    } catch {
+      return false; // Can't parse, assume valid
+    }
+  },
+
+  // Show reconnect banner at top of main content
+  _showReconnectBanner(message) {
+    if (this._reconnectShown) return;
+    this._reconnectShown = true;
+
+    let banner = document.getElementById('reconnectBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'reconnectBanner';
+      banner.className = 'reconnect-banner';
+      const mainContent = document.getElementById('mainContent');
+      if (mainContent) {
+        mainContent.parentNode.insertBefore(banner, mainContent);
+      } else {
+        document.querySelector('.main')?.prepend(banner);
+      }
+    }
+
+    banner.innerHTML = `
+      <div class="reconnect-banner-content">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>${message}</span>
+        <button class="btn btn-primary btn-sm" onclick="Auth.reconnect()">Reconnect</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('reconnectBanner').remove(); Auth._reconnectShown=false;">Dismiss</button>
+      </div>
+    `;
+    banner.style.display = 'flex';
+  },
+
+  // Reconnect — re-authenticate and reload data
+  async reconnect() {
+    this._isUserInitiated = true;
+    this._reconnectShown = false;
+    document.getElementById('reconnectBanner')?.remove();
+
+    try {
+      const accounts = this.msalInstance?.getAllAccounts() || [];
+      if (accounts.length > 0) {
+        // Try silent first with popup fallback
+        const tokenRequest = {
+          scopes: this.graphScopes,
+          account: accounts[0],
+          prompt: 'none'
+        };
+        try {
+          const result = await this.msalInstance.acquireTokenSilent(tokenRequest);
+          if (result?.accessToken) {
+            Toast.show('Session restored. Reloading data...', 'success');
+            this._reloadAllTenantData();
+            this._isUserInitiated = false;
+            return;
+          }
+        } catch {
+          // Silent failed, try popup
+        }
+      }
+
+      // Full re-login via popup
+      const result = await this.msalInstance.loginPopup({
+        scopes: this.graphScopes,
+        prompt: 'select_account'
+      });
+
+      if (result?.account) {
+        AppState.set('isAuthenticated', true);
+        AppState.set('account', {
+          name: result.account.name,
+          username: result.account.username,
+          tenantId: result.account.tenantId
+        });
+
+        const tokens = { ...AppState.get('accessTokens') };
+        tokens[result.account.tenantId] = result.accessToken;
+        AppState.set('accessTokens', tokens);
+
+        this.updateUI();
+        this.updateTenantSelectors();
+        Toast.show('Reconnected successfully. Loading data...', 'success');
+        this._reloadAllTenantData();
+      }
+    } catch (error) {
+      if (error.errorCode !== 'user_cancelled') {
+        Toast.show('Reconnection failed: ' + (error.message || 'Unknown error'), 'error');
+      }
+    }
+    this._isUserInitiated = false;
+  },
+
+  // Reload data for all connected tenants
+  async _reloadAllTenantData() {
+    const tenants = AppState.get('tenants');
+    this._tokenFailures = 0;
+    for (const t of tenants) {
+      Graph.loadAllData(t.id).catch(err => {
+        console.warn(`Failed to load data for tenant ${t.id}:`, err);
+      });
+    }
+  },
+
+  // Flag for user-initiated vs auto token requests
+  _isUserInitiated: false,
 
   // Fetch organization info for a tenant
   async fetchOrgInfo(tenantId) {

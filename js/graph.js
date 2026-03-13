@@ -10,7 +10,9 @@ const Graph = {
   async call(tenantId, endpoint, options = {}) {
     const token = await Auth.getToken(tenantId);
     if (!token) {
-      throw new Error('No access token for tenant ' + tenantId);
+      const err = new Error('No access token for tenant ' + tenantId);
+      err.isAuthError = true;
+      throw err;
     }
 
     const url = (options.beta ? this.betaUrl : this.baseUrl) + endpoint;
@@ -25,8 +27,19 @@ const Graph = {
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Graph API error ${response.status}`);
+      const errBody = await response.json().catch(() => ({}));
+      // 401 = token expired/invalid, trigger reconnect
+      if (response.status === 401) {
+        // Clear the stale token
+        const tokens = { ...AppState.get('accessTokens') };
+        delete tokens[tenantId];
+        AppState.set('accessTokens', tokens);
+        Auth._showReconnectBanner('Your session token has expired. Please reconnect to continue.');
+        const err = new Error('Session expired — please reconnect');
+        err.isAuthError = true;
+        throw err;
+      }
+      throw new Error(errBody.error?.message || `Graph API error ${response.status}`);
     }
 
     if (response.status === 204) return null;
@@ -57,6 +70,14 @@ const Graph = {
 
   // Load all data for a tenant
   async loadAllData(tenantId) {
+    // Pre-check: can we even get a token for this tenant?
+    const token = await Auth.getToken(tenantId);
+    if (!token) {
+      console.warn(`Skipping data load for ${tenantId} — no token available`);
+      Auth._showReconnectBanner('Could not authenticate to load tenant data. Please reconnect.');
+      return;
+    }
+
     AppState.setLoading('global', true);
     Toast.show(`Loading data for ${AppState.getTenantName(tenantId)}...`, 'info');
 
@@ -73,11 +94,14 @@ const Graph = {
 
     const results = await Promise.allSettled(loaders);
     const failures = results.filter(r => r.status === 'rejected');
+    const authFailures = failures.filter(r => r.reason?.isAuthError);
 
     AppState.setLoading('global', false);
 
     if (failures.length === 0) {
       Toast.show(`All data loaded for ${AppState.getTenantName(tenantId)}`, 'success');
+    } else if (authFailures.length > 0) {
+      Toast.show('Session expired — please reconnect to load data.', 'error', 'Authentication Required');
     } else {
       Toast.show(`Loaded with ${failures.length} error(s). Some features may be limited.`, 'warning');
     }

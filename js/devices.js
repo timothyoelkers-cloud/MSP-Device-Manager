@@ -454,6 +454,7 @@ const Devices = {
   async _loadComplianceTab() {
     const container = document.getElementById('detailComplianceContent');
     if (!container || container.dataset.loaded === 'true') return;
+    container.innerHTML = '<div class="text-muted" style="padding:1rem;">Loading compliance data...</div>';
     try {
       const result = await Graph.getDeviceCompliance(this._detailTenantId, this._detailDeviceId);
       const states = result?.value || result || [];
@@ -475,13 +476,34 @@ const Devices = {
       }
       container.dataset.loaded = 'true';
     } catch (err) {
-      container.innerHTML = `<div class="text-muted" style="padding:1rem;color:var(--danger);">Failed to load compliance data: ${err.message}</div>`;
+      const isAuth = err.isAuthError;
+      container.innerHTML = `
+        <div class="retry-state">
+          <p class="text-muted" style="color:${isAuth ? 'var(--warning)' : 'var(--danger)'};">
+            ${isAuth ? 'Session expired — please reconnect to load compliance data.' : 'Failed to load compliance data: ' + err.message}
+          </p>
+          <button class="btn btn-primary btn-sm" onclick="Devices._retryComplianceTab()">
+            ${isAuth ? 'Reconnect & Retry' : 'Retry'}
+          </button>
+        </div>`;
     }
+  },
+
+  async _retryComplianceTab() {
+    const container = document.getElementById('detailComplianceContent');
+    if (container) container.dataset.loaded = '';
+    if (!await Auth.getToken(this._detailTenantId)) {
+      Auth._isUserInitiated = true;
+      await Auth.reconnect();
+      Auth._isUserInitiated = false;
+    }
+    this._loadComplianceTab();
   },
 
   async _loadAppsTab() {
     const container = document.getElementById('detailAppsContent');
     if (!container || container.dataset.loaded === 'true') return;
+    container.innerHTML = '<div class="text-muted" style="padding:1rem;">Loading installed apps...</div>';
     try {
       const result = await Graph.getDeviceInstalledApps(this._detailTenantId, this._detailDeviceId);
       const apps = result?.value || result || [];
@@ -506,13 +528,34 @@ const Devices = {
       }
       container.dataset.loaded = 'true';
     } catch (err) {
-      container.innerHTML = `<div class="text-muted" style="padding:1rem;color:var(--danger);">Failed to load installed apps: ${err.message}</div>`;
+      const isAuth = err.isAuthError;
+      container.innerHTML = `
+        <div class="retry-state">
+          <p class="text-muted" style="color:${isAuth ? 'var(--warning)' : 'var(--danger)'};">
+            ${isAuth ? 'Session expired — please reconnect to load apps.' : 'Failed to load installed apps: ' + err.message}
+          </p>
+          <button class="btn btn-primary btn-sm" onclick="Devices._retryAppsTab()">
+            ${isAuth ? 'Reconnect & Retry' : 'Retry'}
+          </button>
+        </div>`;
     }
+  },
+
+  async _retryAppsTab() {
+    const container = document.getElementById('detailAppsContent');
+    if (container) container.dataset.loaded = '';
+    if (!await Auth.getToken(this._detailTenantId)) {
+      Auth._isUserInitiated = true;
+      await Auth.reconnect();
+      Auth._isUserInitiated = false;
+    }
+    this._loadAppsTab();
   },
 
   async _loadConfigTab() {
     const container = document.getElementById('detailConfigContent');
     if (!container || container.dataset.loaded === 'true') return;
+    container.innerHTML = '<div class="text-muted" style="padding:1rem;">Loading configuration states...</div>';
     try {
       const result = await Graph.getDeviceConfigStates(this._detailTenantId, this._detailDeviceId);
       const states = result?.value || result || [];
@@ -534,8 +577,28 @@ const Devices = {
       }
       container.dataset.loaded = 'true';
     } catch (err) {
-      container.innerHTML = `<div class="text-muted" style="padding:1rem;color:var(--danger);">Failed to load config states: ${err.message}</div>`;
+      const isAuth = err.isAuthError;
+      container.innerHTML = `
+        <div class="retry-state">
+          <p class="text-muted" style="color:${isAuth ? 'var(--warning)' : 'var(--danger)'};">
+            ${isAuth ? 'Session expired — please reconnect to load config data.' : 'Failed to load config states: ' + err.message}
+          </p>
+          <button class="btn btn-primary btn-sm" onclick="Devices._retryConfigTab()">
+            ${isAuth ? 'Reconnect & Retry' : 'Retry'}
+          </button>
+        </div>`;
     }
+  },
+
+  async _retryConfigTab() {
+    const container = document.getElementById('detailConfigContent');
+    if (container) container.dataset.loaded = '';
+    if (!await Auth.getToken(this._detailTenantId)) {
+      Auth._isUserInitiated = true;
+      await Auth.reconnect();
+      Auth._isUserInitiated = false;
+    }
+    this._loadConfigTab();
   },
 
   async saveNotes(tenantId, deviceId) {

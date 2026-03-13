@@ -402,7 +402,7 @@
           if (ready && Auth.msalInstance) {
             const accounts = Auth.msalInstance.getAllAccounts();
             if (accounts.length > 0) {
-              // We have a cached MSAL session — restore auth state and reload data
+              // We have a cached MSAL session — restore auth state
               AppState.set('isAuthenticated', true);
               AppState.set('account', {
                 name: accounts[0].name,
@@ -411,10 +411,27 @@
               });
               Auth.updateUI();
               Auth.updateTenantSelectors();
-              // Reload data for all connected tenants
-              for (const t of tenants) {
-                Graph.loadAllData(t.id).catch(() => {});
+
+              // Pre-validate: try to get a token for the first tenant silently
+              // This confirms the MSAL cache is still valid before bulk loading
+              Auth._isUserInitiated = false;
+              const testToken = await Auth.getToken(tenants[0].id);
+              if (testToken) {
+                // Session is valid — reload all tenant data
+                Toast.show('Session restored. Loading data...', 'info');
+                for (const t of tenants) {
+                  Graph.loadAllData(t.id).catch(err => {
+                    console.warn(`Auto-reload failed for ${t.id}:`, err);
+                  });
+                }
+              } else {
+                // Session expired — show reconnect banner (Auth already shows it)
+                console.warn('MSAL session cache present but token acquisition failed');
               }
+            } else {
+              // No MSAL accounts — session fully expired
+              Auth._showReconnectBanner('Your session has expired. Please reconnect to load tenant data.');
+              Auth.updateTenantSelectors();
             }
           }
         }

@@ -37,6 +37,10 @@ const Apps = {
           <p class="page-subtitle">${apps.length} managed app${apps.length !== 1 ? 's' : ''} ${isAll ? 'across all tenants' : ''}</p>
         </div>
         <div class="page-header-actions">
+          <button class="btn btn-ghost btn-sm" onclick="Apps.reloadData()" title="Reload app data from Graph API">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Reload
+          </button>
           <button class="btn btn-primary" onclick="Apps.showDeployModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Deploy App
@@ -159,7 +163,17 @@ const Apps = {
         <tbody>
           ${apps.length === 0 ? `
             <tr><td colspan="${isAll ? 7 : 6}" class="text-center text-muted" style="padding:3rem;">
-              ${AppState.get('tenants').length === 0 ? 'Connect a tenant to view managed apps.' : (AppState.isLoading('apps') ? 'Loading applications...' : (this.searchTerm || this.typeFilter !== 'all' || this.stateFilter !== 'all' ? 'No apps match your filters.' : 'No applications found. Data may still be loading — try refreshing.'))}
+              ${AppState.get('tenants').length === 0
+                ? 'Connect a tenant to view managed apps.'
+                : (AppState.isLoading('apps')
+                  ? 'Loading applications...'
+                  : (this.searchTerm || this.typeFilter !== 'all' || this.stateFilter !== 'all'
+                    ? 'No apps match your filters.'
+                    : `<div class="retry-state">
+                        <p>No application data loaded yet.</p>
+                        <button class="btn btn-primary btn-sm" onclick="Apps.reloadData()">Reload App Data</button>
+                        <p class="text-xs">If this persists, try clicking <strong>Reconnect</strong> in the banner above.</p>
+                       </div>`))}
             </td></tr>
           ` : apps.map(a => `
             <tr style="cursor:pointer;" onclick="Apps.showDetail('${a._tenantId}','${a.id}')">
@@ -196,7 +210,7 @@ const Apps = {
   // --- Grid View ---
   _renderGrid(apps, isAll) {
     if (apps.length === 0) {
-      return `<div class="card"><div class="empty-state"><h3 class="empty-state-title">No applications found</h3><p class="empty-state-text">${AppState.get('tenants').length === 0 ? 'Connect a tenant to view apps.' : 'No apps match your filters.'}</p></div></div>`;
+      return `<div class="card"><div class="empty-state"><h3 class="empty-state-title">No applications found</h3><p class="empty-state-text">${AppState.get('tenants').length === 0 ? 'Connect a tenant to view apps.' : (this.searchTerm || this.typeFilter !== 'all' || this.stateFilter !== 'all' ? 'No apps match your filters.' : '<button class="btn btn-primary btn-sm" onclick="Apps.reloadData()" style="margin-top:8px;">Reload App Data</button>')}</p></div></div>`;
     }
     return `
       <div class="grid grid-auto gap-4 stagger" style="padding:var(--sp-4) 0;">
@@ -330,14 +344,40 @@ const Apps = {
   },
 
   // --- Deploy Modal ---
+  // Reload app data for all connected tenants
+  async reloadData() {
+    const tenants = AppState.get('tenants');
+    if (!tenants.length) {
+      Toast.show('No tenants connected.', 'warning');
+      return;
+    }
+    Auth._isUserInitiated = true;
+    for (const t of tenants) {
+      const token = await Auth.getToken(t.id);
+      if (token) {
+        await Graph.loadApps(t.id).catch(err => console.warn('App reload failed:', err));
+      }
+    }
+    Auth._isUserInitiated = false;
+    this.render();
+    const apps = AppState.getForContext('apps');
+    if (apps.length > 0) {
+      Toast.show(`${apps.length} app(s) loaded.`, 'success');
+    } else {
+      Toast.show('Still no app data. You may need to reconnect.', 'warning');
+    }
+  },
+
   showDeployModal() {
     const apps = AppState.getForContext('apps');
     if (!apps.length) {
       const tenants = AppState.get('tenants');
       if (tenants.length === 0) {
         Toast.show('No apps available. Connect a tenant first.', 'warning');
-      } else {
+      } else if (AppState.isLoading('apps')) {
         Toast.show('App data is still loading. Please wait a moment and try again.', 'info');
+      } else {
+        Toast.show('No app data loaded. Try clicking "Reload App Data" on the Apps page, or reconnect.', 'warning');
       }
       return;
     }
