@@ -516,4 +516,103 @@ const Graph = {
   async getScriptRunHistory(tenantId, scriptId) {
     return await this.callPaged(tenantId, `/deviceManagement/deviceHealthScripts/${scriptId}/deviceRunStates`, { beta: true });
   },
+
+  // === USER LIFECYCLE ===
+
+  async updateUser(tenantId, userId, updates) {
+    await this.call(tenantId, `/users/${userId}`, { method: 'PATCH', body: updates });
+  },
+
+  async deleteUser(tenantId, userId) {
+    await this.call(tenantId, `/users/${userId}`, { method: 'DELETE' });
+  },
+
+  async revokeUserSessions(tenantId, userId) {
+    await this.call(tenantId, `/users/${userId}/revokeSignInSessions`, { method: 'POST' });
+  },
+
+  async resetUserPassword(tenantId, userId, newPassword) {
+    await this.call(tenantId, `/users/${userId}`, {
+      method: 'PATCH',
+      body: {
+        passwordProfile: {
+          forceChangePasswordNextSignIn: true,
+          password: newPassword
+        }
+      }
+    });
+  },
+
+  async removeAllUserLicenses(tenantId, userId) {
+    // First get current licenses
+    const user = await this.call(tenantId, `/users/${userId}?$select=assignedLicenses`);
+    if (user?.assignedLicenses?.length > 0) {
+      await this.call(tenantId, `/users/${userId}/assignLicense`, {
+        method: 'POST',
+        body: {
+          addLicenses: [],
+          removeLicenses: user.assignedLicenses.map(l => l.skuId)
+        }
+      });
+    }
+  },
+
+  async getUserGroups(tenantId, userId) {
+    return await this.callPaged(tenantId, `/users/${userId}/memberOf?$select=id,displayName,groupTypes,mailEnabled,securityEnabled`);
+  },
+
+  async removeUserFromGroup(tenantId, groupId, userId) {
+    await this.call(tenantId, `/groups/${groupId}/members/${userId}/$ref`, { method: 'DELETE' });
+  },
+
+  async removeUserFromAllGroups(tenantId, userId) {
+    const groups = await this.getUserGroups(tenantId, userId);
+    const removable = (groups || []).filter(g => g['@odata.type'] === '#microsoft.graph.group');
+    for (const group of removable) {
+      try {
+        await this.removeUserFromGroup(tenantId, group.id, userId);
+      } catch (e) {
+        console.warn(`Failed to remove from group ${group.displayName}:`, e);
+      }
+    }
+  },
+
+  async setAutoReply(tenantId, userId, message) {
+    await this.call(tenantId, `/users/${userId}/mailboxSettings`, {
+      method: 'PATCH',
+      body: {
+        automaticRepliesSetting: {
+          status: 'alwaysEnabled',
+          internalReplyMessage: message,
+          externalReplyMessage: message
+        }
+      }
+    });
+  },
+
+  async setMailForwarding(tenantId, userId, forwardTo) {
+    await this.call(tenantId, `/users/${userId}/mailboxSettings`, {
+      method: 'PATCH',
+      body: {
+        automaticRepliesSetting: { status: 'alwaysEnabled' }
+      }
+    });
+    // Mail forwarding requires Exchange cmdlet or mail flow rule
+    // Using Graph forwarding address on messages
+    await this.call(tenantId, `/users/${userId}`, {
+      method: 'PATCH',
+      body: { otherMails: [forwardTo] }
+    });
+  },
+
+  async wipeUserDevices(tenantId, userId) {
+    const devices = await this.getUserDevices(tenantId, userId);
+    for (const device of devices) {
+      try {
+        await this.wipeDevice(tenantId, device.id);
+      } catch (e) {
+        console.warn(`Failed to wipe device ${device.deviceName}:`, e);
+      }
+    }
+  },
 };

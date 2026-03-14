@@ -86,6 +86,23 @@ const Notifications = {
       });
     }
 
+    // Check for due offboardings
+    if (typeof Offboarding !== 'undefined') {
+      const due = Offboarding.checkDue();
+      due.forEach(task => {
+        const key = `offboard_due_${task.id}`;
+        if (!this._items.find(n => n.key === key && (Date.now() - n.timestamp) < 3600000)) {
+          this.add({
+            key,
+            type: 'warning',
+            title: 'Offboarding Due',
+            message: `Scheduled offboarding for ${task.userName} is due today`,
+            action: 'offboarding'
+          });
+        }
+      });
+    }
+
     this._updateBadge();
   },
 

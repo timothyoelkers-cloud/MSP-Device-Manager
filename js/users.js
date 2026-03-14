@@ -20,8 +20,6 @@ const Users = {
     const enabled = users.filter(u => u.accountEnabled).length;
     const disabled = users.filter(u => !u.accountEnabled).length;
     const licensed = users.filter(u => u.assignedLicenses?.length > 0).length;
-    const admins = users.filter(u => u._isAdmin).length;
-
     if (AppState.isLoading('users') && users.length === 0) {
       main.innerHTML = `
         <div class="page-header"><div class="page-header-left">
@@ -44,6 +42,10 @@ const Users = {
           <button class="btn btn-secondary btn-sm" onclick="Users.exportCSV()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export CSV
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="Router.navigate('offboarding')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="11" x2="23" y2="11"/></svg>
+            Offboarding
           </button>
         </div>
       </div>
@@ -188,30 +190,64 @@ const Users = {
       </div>
 
       <div class="detail-section">
+        <div class="detail-section-title">Group Membership</div>
+        <div id="userGroupsContent"><div class="text-muted text-sm">Loading groups...</div></div>
+      </div>
+
+      <div class="detail-section">
         <div class="detail-section-title">Managed Devices</div>
         <div id="userDevicesContent"><div class="text-muted text-sm">Loading devices...</div></div>
+      </div>
+
+      <div class="detail-section" style="padding-top:12px;border-top:1px solid var(--border);">
+        <button class="btn btn-danger btn-sm w-full" onclick="Offboarding.show('${tenantId}','${userId}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="11" x2="23" y2="11"/></svg>
+          Offboard User
+        </button>
       </div>
     `;
     panel.classList.add('open');
 
-    // Load user's devices
-    try {
-      const devices = await Graph.getUserDevices(tenantId, userId);
-      const container = document.getElementById('userDevicesContent');
-      if (!container) return;
-      if (!devices.length) {
-        container.innerHTML = '<div class="text-muted text-sm">No managed devices</div>';
+    // Load user's groups and devices in parallel
+    const [groupsResult, devicesResult] = await Promise.allSettled([
+      Graph.getUserGroups(tenantId, userId),
+      Graph.getUserDevices(tenantId, userId)
+    ]);
+
+    // Render groups
+    const groupsContainer = document.getElementById('userGroupsContent');
+    if (groupsContainer) {
+      if (groupsResult.status === 'fulfilled') {
+        const groups = (groupsResult.value || []).filter(g => g['@odata.type'] === '#microsoft.graph.group');
+        groupsContainer.innerHTML = groups.length === 0
+          ? '<div class="text-muted text-sm">No group memberships</div>'
+          : groups.map(g => `
+            <div class="detail-row">
+              <span class="detail-label" style="flex:1;">${g.displayName || 'Unknown'}</span>
+              <span class="detail-value"><span class="badge ${g.securityEnabled ? 'badge-primary' : 'badge-default'}">${g.securityEnabled ? 'Security' : 'M365'}</span></span>
+            </div>
+          `).join('');
       } else {
-        container.innerHTML = devices.map(d => `
-          <div class="detail-row" style="cursor:pointer;" onclick="Devices.showDeviceDetail('${tenantId}','${d.id}')">
-            <span class="detail-label" style="flex:1;">${d.deviceName || 'Unknown'}</span>
-            <span class="detail-value"><span class="badge ${d.complianceState === 'compliant' ? 'badge-success' : 'badge-warning'}">${d.operatingSystem || ''}</span></span>
-          </div>
-        `).join('');
+        groupsContainer.innerHTML = '<div class="text-muted text-sm" style="color:var(--danger);">Failed to load groups</div>';
       }
-    } catch (err) {
-      const container = document.getElementById('userDevicesContent');
-      if (container) container.innerHTML = `<div class="text-muted text-sm" style="color:var(--danger);">Failed to load devices</div>`;
+    }
+
+    // Render devices
+    const devicesContainer = document.getElementById('userDevicesContent');
+    if (devicesContainer) {
+      if (devicesResult.status === 'fulfilled') {
+        const devices = devicesResult.value || [];
+        devicesContainer.innerHTML = devices.length === 0
+          ? '<div class="text-muted text-sm">No managed devices</div>'
+          : devices.map(d => `
+            <div class="detail-row" style="cursor:pointer;" onclick="Devices.showDeviceDetail('${tenantId}','${d.id}')">
+              <span class="detail-label" style="flex:1;">${d.deviceName || 'Unknown'}</span>
+              <span class="detail-value"><span class="badge ${d.complianceState === 'compliant' ? 'badge-success' : 'badge-warning'}">${d.operatingSystem || ''}</span></span>
+            </div>
+          `).join('');
+      } else {
+        devicesContainer.innerHTML = '<div class="text-muted text-sm" style="color:var(--danger);">Failed to load devices</div>';
+      }
     }
   },
 

@@ -26,6 +26,7 @@ const Router = {
     'alerts': ['Multi-Tenant', 'Alerts'],
     'reports': ['Multi-Tenant', 'Reports'],
     'auditlog': ['Multi-Tenant', 'Audit Log'],
+    'offboarding': ['Identity & Access', 'Offboarding'],
     'settings': ['Settings'],
     'webhooks': ['Settings', 'Webhooks'],
     'rbac': ['Settings', 'Access Control'],
@@ -57,6 +58,7 @@ const Router = {
     'webhooks':        () => Webhooks.render(),
     'rbac':            () => RBAC.render(),
     'branding':        () => Branding.render(),
+    'offboarding':     () => Offboarding.render(),
     'settings':        () => Router.renderSettings(),
   },
 

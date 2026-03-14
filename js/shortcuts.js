@@ -26,6 +26,7 @@ const Shortcuts = {
     m: { page: 'comparison',       label: 'Tenant Compare' },
     x: { page: 'conditionalaccess',label: 'Conditional Access' },
     k: { page: 'scripts',          label: 'Remediations' },
+    f: { page: 'offboarding',      label: 'Offboarding' },
   },
 
   init() {
@@ -136,6 +137,7 @@ const Shortcuts = {
       { keys: 'g then i',    desc: 'Go to Audit Log' },
       { keys: 'g then m',    desc: 'Go to Tenant Compare' },
       { keys: 'g then x',    desc: 'Go to Conditional Access' },
+      { keys: 'g then f',    desc: 'Go to Offboarding' },
       { keys: '/ or Ctrl+K', desc: 'Focus search input' },
       { keys: 'Escape',      desc: 'Close modal / panel' },
       { keys: 'n',           desc: 'Connect new tenant' }
