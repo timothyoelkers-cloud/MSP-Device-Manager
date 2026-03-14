@@ -47,6 +47,7 @@ const Offboarding = {
     this._scheduleDate = '';
     this._forwardEmail = '';
     this._outOfOfficeMsg = '';
+    this._mailboxDelegate = '';
     this._renderWizard();
   },
 
@@ -144,7 +145,7 @@ const Offboarding = {
               <label style="display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border:1px solid ${a.critical ? 'var(--danger-pale, #fee2e2)' : 'var(--border-light)'};border-radius:var(--radius);cursor:pointer;transition:background 0.15s;"
                 onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
                 <input type="checkbox" class="toggle" style="margin-top:2px;" ${a.checked ? 'checked' : ''}
-                  onchange="Offboarding._selectedActions[${i}].checked = this.checked">
+                  onchange="Offboarding._selectedActions[${i}].checked = this.checked; if(['forwardEmail','setOutOfOffice','convertMailbox'].includes('${a.id}')) Offboarding._renderWizard();">
                 <div style="flex:1;">
                   <div class="text-sm fw-500">${a.icon} ${a.label} ${a.critical ? '<span class="badge badge-danger" style="font-size:10px;padding:1px 6px;">Critical</span>' : ''}</div>
                   <div class="text-xs text-muted">${a.desc}</div>
@@ -154,19 +155,45 @@ const Offboarding = {
           </div>
 
           ${this._selectedActions.find(a => a.id === 'forwardEmail' && a.checked) ? `
-            <div class="form-group mt-4">
+            <div class="form-group mt-4" style="background:var(--gray-50);padding:12px 16px;border-radius:var(--radius);border:1px solid var(--border-light);">
               <label class="form-label">Forward email to:</label>
               <input type="email" class="form-input" id="offboardForwardEmail" value="${this._forwardEmail}"
-                placeholder="manager@company.com" onchange="Offboarding._forwardEmail = this.value">
+                placeholder="manager@company.com" oninput="Offboarding._forwardEmail = this.value"
+                list="offboardUserList">
+              <datalist id="offboardUserList">
+                ${(AppState.get('users')[this._currentTenant] || [])
+                  .filter(u => u.accountEnabled && u.id !== this._currentUser?.id)
+                  .slice(0, 50)
+                  .map(u => `<option value="${u.mail || u.userPrincipalName}">${u.displayName}</option>`).join('')}
+              </datalist>
+              <span class="form-hint">Select a colleague or type an email address to forward incoming mail to.</span>
             </div>
           ` : ''}
 
           ${this._selectedActions.find(a => a.id === 'setOutOfOffice' && a.checked) ? `
-            <div class="form-group mt-4">
+            <div class="form-group mt-4" style="background:var(--gray-50);padding:12px 16px;border-radius:var(--radius);border:1px solid var(--border-light);">
               <label class="form-label">Out-of-office message:</label>
               <textarea class="form-textarea" id="offboardOOO" rows="3"
+                style="background:var(--surface);"
                 placeholder="This person is no longer with the organization. Please contact..."
-                onchange="Offboarding._outOfOfficeMsg = this.value">${this._outOfOfficeMsg}</textarea>
+                oninput="Offboarding._outOfOfficeMsg = this.value">${this._outOfOfficeMsg}</textarea>
+              <span class="form-hint">This auto-reply will be sent to both internal and external senders.</span>
+            </div>
+          ` : ''}
+
+          ${this._selectedActions.find(a => a.id === 'convertMailbox' && a.checked) ? `
+            <div class="form-group mt-4" style="background:var(--gray-50);padding:12px 16px;border-radius:var(--radius);border:1px solid var(--border-light);">
+              <label class="form-label">Grant shared mailbox access to:</label>
+              <input type="email" class="form-input" id="offboardMailboxDelegate" value="${this._mailboxDelegate || ''}"
+                placeholder="manager@company.com" oninput="Offboarding._mailboxDelegate = this.value"
+                list="offboardDelegateList">
+              <datalist id="offboardDelegateList">
+                ${(AppState.get('users')[this._currentTenant] || [])
+                  .filter(u => u.accountEnabled && u.id !== this._currentUser?.id)
+                  .slice(0, 50)
+                  .map(u => `<option value="${u.mail || u.userPrincipalName}">${u.displayName}</option>`).join('')}
+              </datalist>
+              <span class="form-hint">Optional: grant full access to the shared mailbox after conversion.</span>
             </div>
           ` : ''}
         `;
@@ -233,6 +260,7 @@ const Offboarding = {
           </div>
 
           ${this._forwardEmail ? `<div class="detail-row"><span class="detail-label">Forward to</span><span class="detail-value">${this._forwardEmail}</span></div>` : ''}
+          ${this._mailboxDelegate ? `<div class="detail-row"><span class="detail-label">Mailbox delegate</span><span class="detail-value">${this._mailboxDelegate}</span></div>` : ''}
         `;
     }
   },
@@ -246,6 +274,7 @@ const Offboarding = {
     if (this._step === 1) {
       this._forwardEmail = document.getElementById('offboardForwardEmail')?.value || this._forwardEmail;
       this._outOfOfficeMsg = document.getElementById('offboardOOO')?.value || this._outOfOfficeMsg;
+      this._mailboxDelegate = document.getElementById('offboardMailboxDelegate')?.value || this._mailboxDelegate;
     }
     this._step++;
     this._renderWizard();
