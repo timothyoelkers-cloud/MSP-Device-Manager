@@ -96,6 +96,7 @@ const Graph = {
       this.loadEnrollmentConfigs(tenantId),
       this.loadSecurityBaselines(tenantId),
       this.loadHealthScripts(tenantId),
+      this.loadSubscribedSkus(tenantId),
     ];
 
     const results = await Promise.allSettled(loaders);
@@ -515,6 +516,19 @@ const Graph = {
   // Get remediation script run history
   async getScriptRunHistory(tenantId, scriptId) {
     return await this.callPaged(tenantId, `/deviceManagement/deviceHealthScripts/${scriptId}/deviceRunStates`, { beta: true });
+  },
+
+  // === LICENSE & USER CREATION ===
+
+  async loadSubscribedSkus(tenantId) {
+    const skus = await this.callPaged(tenantId, '/subscribedSkus');
+    const cache = { ...AppState.get('subscribedSkus') };
+    cache[tenantId] = skus;
+    AppState.set('subscribedSkus', cache);
+  },
+
+  async createUser(tenantId, userPayload) {
+    return await this.call(tenantId, '/users', { method: 'POST', body: userPayload });
   },
 
   // === USER LIFECYCLE ===

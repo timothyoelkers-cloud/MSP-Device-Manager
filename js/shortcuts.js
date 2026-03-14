@@ -27,6 +27,10 @@ const Shortcuts = {
     x: { page: 'conditionalaccess',label: 'Conditional Access' },
     k: { page: 'scripts',          label: 'Remediations' },
     f: { page: 'offboarding',      label: 'Offboarding' },
+    y: { page: 'licenses',         label: 'Licenses' },
+    h: { page: 'scorecard',        label: 'Security Scorecard' },
+    j: { page: 'activityfeed',     label: 'Activity Feed' },
+    q: { page: 'exportcenter',     label: 'Data Export' },
   },
 
   init() {
@@ -138,6 +142,10 @@ const Shortcuts = {
       { keys: 'g then m',    desc: 'Go to Tenant Compare' },
       { keys: 'g then x',    desc: 'Go to Conditional Access' },
       { keys: 'g then f',    desc: 'Go to Offboarding' },
+      { keys: 'g then y',    desc: 'Go to Licenses' },
+      { keys: 'g then h',    desc: 'Go to Security Scorecard' },
+      { keys: 'g then j',    desc: 'Go to Activity Feed' },
+      { keys: 'g then q',    desc: 'Go to Data Export' },
       { keys: '/ or Ctrl+K', desc: 'Focus search input' },
       { keys: 'Escape',      desc: 'Close modal / panel' },
       { keys: 'n',           desc: 'Connect new tenant' }

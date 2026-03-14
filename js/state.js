@@ -35,6 +35,7 @@ const AppState = {
     enrollmentConfigs: {},
     securityBaselines: {},
     healthScripts: {},
+    subscribedSkus: {},
 
     // UI state
     currentPage: 'dashboard',
