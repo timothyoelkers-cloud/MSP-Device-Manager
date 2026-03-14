@@ -52,6 +52,10 @@ const Reports = {
           <div class="card-header">
             <div class="card-header-title">${this.reportTypes.find(r => r.id === this.selectedReport)?.name || 'Report'}</div>
             <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm" onclick="Reports.showScheduleModal()" data-tooltip="Schedule Report">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Schedule
+              </button>
               <button class="btn btn-secondary btn-sm" onclick="Reports.exportCSV()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
@@ -319,5 +323,107 @@ const Reports = {
     </head><body><h1>MSP Device Manager — ${this.reportTypes.find(r => r.id === this.selectedReport)?.name}</h1>${content.innerHTML}</body></html>`);
     win.document.close();
     win.print();
+  },
+
+  /* ---- Scheduled Reports ---- */
+  _scheduleStorageKey: 'msp_scheduled_reports',
+
+  getSchedules() {
+    try { return JSON.parse(localStorage.getItem(this._scheduleStorageKey) || '[]'); } catch (e) { return []; }
+  },
+
+  saveSchedules(schedules) {
+    localStorage.setItem(this._scheduleStorageKey, JSON.stringify(schedules));
+  },
+
+  showScheduleModal() {
+    const existing = document.getElementById('scheduleReportModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'scheduleReportModal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">Schedule Report</h3>
+          <button class="modal-close" onclick="document.getElementById('scheduleReportModal').remove()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group mb-4">
+            <label class="form-label">Report Type</label>
+            <select class="form-select" id="schedReportType">
+              ${this.reportTypes.map(r => `<option value="${r.id}" ${r.id === this.selectedReport ? 'selected' : ''}>${r.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group mb-4">
+            <label class="form-label">Frequency</label>
+            <select class="form-select" id="schedFrequency">
+              <option value="daily">Daily</option>
+              <option value="weekly" selected>Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div class="form-group mb-4">
+            <label class="form-label">Day / Time</label>
+            <div style="display:flex;gap:8px;">
+              <select class="form-select" id="schedDay" style="flex:1;">
+                <option value="monday">Monday</option>
+                <option value="tuesday">Tuesday</option>
+                <option value="wednesday">Wednesday</option>
+                <option value="thursday">Thursday</option>
+                <option value="friday" selected>Friday</option>
+              </select>
+              <input type="time" class="form-input" id="schedTime" value="09:00" style="flex:1;">
+            </div>
+            <span class="form-hint">Reports auto-export CSV at the scheduled time (when the app is open).</span>
+          </div>
+          <div class="form-group mb-4">
+            <label class="form-label">Label (optional)</label>
+            <input type="text" class="form-input" id="schedLabel" placeholder="e.g., Weekly Compliance Check">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="document.getElementById('scheduleReportModal').remove()">Cancel</button>
+          <button class="btn btn-primary" onclick="Reports._addSchedule()">Create Schedule</button>
+        </div>
+      </div>
+    `;
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+  },
+
+  _addSchedule() {
+    const schedules = this.getSchedules();
+    schedules.push({
+      id: Date.now().toString(36),
+      reportType: document.getElementById('schedReportType')?.value,
+      frequency: document.getElementById('schedFrequency')?.value,
+      day: document.getElementById('schedDay')?.value,
+      time: document.getElementById('schedTime')?.value || '09:00',
+      label: document.getElementById('schedLabel')?.value || '',
+      enabled: true,
+      created: new Date().toISOString(),
+      lastRun: null
+    });
+    this.saveSchedules(schedules);
+    document.getElementById('scheduleReportModal')?.remove();
+    Toast.show('Report schedule created', 'success');
+    this.render();
+  },
+
+  deleteSchedule(id) {
+    this.saveSchedules(this.getSchedules().filter(s => s.id !== id));
+    this.render();
+  },
+
+  toggleSchedule(id) {
+    const schedules = this.getSchedules();
+    const s = schedules.find(x => x.id === id);
+    if (s) s.enabled = !s.enabled;
+    this.saveSchedules(schedules);
+    this.render();
   }
 };

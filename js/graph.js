@@ -328,6 +328,12 @@ const Graph = {
     });
   },
 
+  async patchDevice(tenantId, deviceId, updates) {
+    await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}`, {
+      method: 'PATCH', body: updates
+    });
+  },
+
   async getDeviceInstalledApps(tenantId, deviceId) {
     return await this.callPaged(tenantId, `/deviceManagement/managedDevices/${deviceId}/detectedApps`);
   },

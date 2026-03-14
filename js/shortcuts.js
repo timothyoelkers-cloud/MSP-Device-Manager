@@ -8,13 +8,24 @@ const Shortcuts = {
 
   // Map of two-key chords (g + second key)
   _chords: {
-    d: { page: 'dashboard',      label: 'Dashboard' },
-    t: { page: 'tenants',        label: 'Tenants' },
-    v: { page: 'devices',        label: 'Devices' },
-    c: { page: 'compliance',     label: 'Compliance' },
-    p: { page: 'configurations', label: 'Configuration Profiles' },
-    s: { page: 'security',       label: 'Endpoint Security' },
-    a: { page: 'apps',           label: 'Applications' }
+    d: { page: 'dashboard',        label: 'Dashboard' },
+    t: { page: 'tenants',          label: 'Tenants' },
+    v: { page: 'devices',          label: 'Devices' },
+    c: { page: 'compliance',       label: 'Compliance' },
+    p: { page: 'configurations',   label: 'Configuration Profiles' },
+    s: { page: 'security',         label: 'Endpoint Security' },
+    a: { page: 'apps',             label: 'Applications' },
+    u: { page: 'users',            label: 'Users' },
+    r: { page: 'reports',          label: 'Reports' },
+    l: { page: 'alerts',           label: 'Alerts' },
+    o: { page: 'autopilot',        label: 'Autopilot' },
+    w: { page: 'updates',          label: 'Windows Updates' },
+    b: { page: 'baselines',        label: 'Security Baselines' },
+    e: { page: 'enrollment',       label: 'Enrollment' },
+    i: { page: 'auditlog',         label: 'Audit Log' },
+    m: { page: 'comparison',       label: 'Tenant Compare' },
+    x: { page: 'conditionalaccess',label: 'Conditional Access' },
+    k: { page: 'scripts',          label: 'Remediations' },
   },
 
   init() {
@@ -117,6 +128,14 @@ const Shortcuts = {
       { keys: 'g then p',    desc: 'Go to Configuration Profiles' },
       { keys: 'g then s',    desc: 'Go to Endpoint Security' },
       { keys: 'g then a',    desc: 'Go to Applications' },
+      { keys: 'g then u',    desc: 'Go to Users' },
+      { keys: 'g then r',    desc: 'Go to Reports' },
+      { keys: 'g then l',    desc: 'Go to Alerts' },
+      { keys: 'g then b',    desc: 'Go to Security Baselines' },
+      { keys: 'g then e',    desc: 'Go to Enrollment' },
+      { keys: 'g then i',    desc: 'Go to Audit Log' },
+      { keys: 'g then m',    desc: 'Go to Tenant Compare' },
+      { keys: 'g then x',    desc: 'Go to Conditional Access' },
       { keys: '/ or Ctrl+K', desc: 'Focus search input' },
       { keys: 'Escape',      desc: 'Close modal / panel' },
       { keys: 'n',           desc: 'Connect new tenant' }

@@ -320,6 +320,46 @@
       <div class="sidebar-divider"></div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title">Tools</div>
+        <ul class="sidebar-nav">
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" onclick="PolicyWizard.show()" style="cursor:pointer;">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </span>
+              Policy Wizard
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="webhooks" onclick="Router.navigate('webhooks')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+              </span>
+              Webhooks
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="rbac" onclick="Router.navigate('rbac')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
+              Access Control
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="branding" onclick="Router.navigate('branding')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+              </span>
+              Custom Branding
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">Tenant Filter</div>
         <div class="sidebar-tenant-filter">
           <select class="sidebar-tenant-select" id="sidebarTenantFilter" onchange="AppState.setActiveTenant(this.value)">
@@ -483,6 +523,13 @@
   <script src="js/baselines.js"></script>
   <script src="js/auditlog.js"></script>
   <script src="js/comparison.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/savedviews.js"></script>
+  <script src="js/policywizard.js"></script>
+  <script src="js/onboarding.js"></script>
+  <script src="js/webhooks.js"></script>
+  <script src="js/rbac.js"></script>
+  <script src="js/branding.js"></script>
   <script src="js/licensing.js"></script>
   <script src="js/sponsor.js"></script>
   <script src="js/dashboard.js"></script>
@@ -533,7 +580,11 @@
     }
 
     function toggleNotifications() {
-      Toast.show('No new notifications', 'info');
+      if (typeof Notifications !== 'undefined') {
+        Notifications.toggle();
+      } else {
+        Toast.show('No new notifications', 'info');
+      }
     }
 
     // Dark Mode

@@ -307,7 +307,7 @@ const Devices = {
       <div class="detail-tab-content" id="detailTab-overview" style="display:block;">
         <div class="detail-section">
           <div class="detail-section-title">Device Information</div>
-          <div class="detail-row"><span class="detail-label">Device Name</span><span class="detail-value">${device.deviceName || '-'}</span></div>
+          <div class="detail-row"><span class="detail-label">Device Name</span><span class="detail-value inline-editable" onclick="Devices._startInlineEdit(this, '${tenantId}', '${deviceId}', 'deviceName')" data-tooltip="Click to edit">${device.deviceName || '-'}</span></div>
           <div class="detail-row"><span class="detail-label">Manufacturer</span><span class="detail-value">${device.manufacturer || '-'}</span></div>
           <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${device.model || '-'}</span></div>
           <div class="detail-row"><span class="detail-label">Serial Number</span><span class="detail-value text-mono">${device.serialNumber || '-'}</span></div>
@@ -610,6 +610,86 @@ const Devices = {
       Toast.show('Device notes saved', 'success');
     } catch (err) {
       Toast.show('Failed to save notes: ' + err.message, 'error');
+    }
+  },
+
+  /* ---- Inline Editing ---- */
+  _startInlineEdit(el, tenantId, deviceId, field) {
+    if (el.querySelector('input')) return; // Already editing
+    const currentValue = el.textContent.trim();
+    const originalHtml = el.innerHTML;
+    el.innerHTML = `
+      <input type="text" class="form-input" value="${currentValue === '-' ? '' : currentValue}"
+        style="padding:2px 6px;font-size:inherit;width:100%;min-width:120px;"
+        onkeydown="if(event.key==='Enter'){Devices._saveInlineEdit('${tenantId}','${deviceId}','${field}',this.value,this.parentElement);event.preventDefault();}if(event.key==='Escape'){this.parentElement.innerHTML='${originalHtml.replace(/'/g, "\\'")}';}"
+        onblur="Devices._saveInlineEdit('${tenantId}','${deviceId}','${field}',this.value,this.parentElement)">
+    `;
+    const input = el.querySelector('input');
+    if (input) { input.focus(); input.select(); }
+  },
+
+  async _saveInlineEdit(tenantId, deviceId, field, newValue, el) {
+    if (!newValue || !newValue.trim()) {
+      el.textContent = '-';
+      return;
+    }
+    const trimmed = newValue.trim();
+    el.textContent = trimmed;
+
+    // Update local cache
+    const devices = AppState.get('devices')[tenantId] || [];
+    const device = devices.find(d => d.id === deviceId);
+    if (device) device[field] = trimmed;
+
+    // Update header if editing device name
+    if (field === 'deviceName') {
+      const header = document.getElementById('detailDeviceName');
+      if (header) header.textContent = trimmed;
+    }
+
+    // Attempt Graph API update
+    try {
+      await Graph.patchDevice(tenantId, deviceId, { [field]: trimmed });
+      Toast.show(`${field} updated`, 'success');
+    } catch (err) {
+      Toast.show('Save failed: ' + err.message, 'warning');
+    }
+  },
+
+  /* ---- Bulk Cross-Tenant Operations ---- */
+  async bulkCrossTenantAction(actionType) {
+    const tenants = AppState.get('tenants');
+    if (tenants.length === 0) { Toast.show('No tenants connected', 'warning'); return; }
+
+    const allDevices = AppState.getDevicesForContext();
+    const targetDevices = allDevices.filter(d => {
+      if (actionType === 'syncStale') {
+        return d.lastSyncDateTime && (Date.now() - new Date(d.lastSyncDateTime).getTime()) > 7 * 86400000;
+      }
+      if (actionType === 'syncNonCompliant') {
+        return d.complianceState === 'noncompliant';
+      }
+      return false;
+    });
+
+    if (targetDevices.length === 0) {
+      Toast.show('No devices match criteria', 'info');
+      return;
+    }
+
+    if (!confirm(`This will sync ${targetDevices.length} device(s) across ${tenants.length} tenant(s). Continue?`)) return;
+
+    Toast.show(`Syncing ${targetDevices.length} devices...`, 'info');
+    let success = 0, failed = 0;
+    for (const d of targetDevices) {
+      try {
+        await Graph.syncDevice(d._tenantId, d.id);
+        success++;
+      } catch (e) { failed++; }
+    }
+    Toast.show(`Sync complete: ${success} succeeded, ${failed} failed`, success > 0 ? 'success' : 'warning');
+    if (typeof AuditLog !== 'undefined') {
+      AuditLog.log('Bulk Cross-Tenant Sync', `Synced ${success}/${targetDevices.length} devices (${actionType})`, null, 'action');
     }
   },
 

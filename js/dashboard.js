@@ -714,10 +714,154 @@ const Dashboard = {
         </div>
       ` : ''}
 
+      <!-- ======== AI-Powered Recommendations ======== -->
+      ${tenants.length > 0 && total > 0 ? `
+        <div class="card animate-fade-up mb-6">
+          <div class="card-header">
+            <div>
+              <div class="card-header-title">Recommendations</div>
+              <div class="card-header-subtitle">Smart suggestions based on your fleet data</div>
+            </div>
+            <span class="badge badge-primary">AI</span>
+          </div>
+          <div class="card-body" style="padding:0;">
+            ${this._generateRecommendations(allDevices, tenants).map((rec, i) => `
+              <div class="flex items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-light);${i === 0 ? '' : ''}">
+                <div style="width:36px;height:36px;border-radius:var(--radius-md);background:${rec.bgColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  ${rec.icon}
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div class="text-sm fw-500">${rec.title}</div>
+                  <div class="text-xs text-muted" style="margin-top:1px;">${rec.description}</div>
+                </div>
+                <span class="badge ${rec.severity === 'high' ? 'badge-danger' : rec.severity === 'medium' ? 'badge-warning' : 'badge-info'}">${rec.severity}</span>
+                ${rec.action ? `<button class="btn btn-ghost btn-sm" onclick="${rec.action}">Fix</button>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- ======== Policy Wizard Quick Launch ======== -->
+      ${tenants.length > 0 ? `
+        <div class="card animate-fade-up mb-6" style="background:linear-gradient(135deg, var(--primary-bg), var(--secondary-pale));border-color:var(--primary-pale);">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+            <div class="stat-card-icon blue" style="width:48px;height:48px;margin-bottom:0;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div class="fw-600">Deploy a Policy</div>
+              <div class="text-sm text-muted">Use the guided wizard to deploy compliance, conditional access, or update policies across tenants.</div>
+            </div>
+            <button class="btn btn-primary" onclick="PolicyWizard.show()">Launch Wizard</button>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Sponsor Showcase -->
       <div class="mt-6">
         ${Sponsor.renderPoweredBy()}
       </div>
     `;
+  },
+
+  /* ---- AI Recommendations Engine (rule-based) ---- */
+  _generateRecommendations(allDevices, tenants) {
+    const recs = [];
+    const total = allDevices.length;
+    if (total === 0) return recs;
+
+    const now = Date.now();
+    const compliant = allDevices.filter(d => d.complianceState === 'compliant').length;
+    const encrypted = allDevices.filter(d => d.isEncrypted).length;
+    const stale = allDevices.filter(d => d.lastSyncDateTime && (now - new Date(d.lastSyncDateTime).getTime()) > 7 * 86400000).length;
+    const nonCompliant = allDevices.filter(d => d.complianceState === 'noncompliant').length;
+    const compPct = Math.round((compliant / total) * 100);
+    const encPct = Math.round((encrypted / total) * 100);
+
+    // Low compliance rate
+    if (compPct < 80) {
+      recs.push({
+        icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+        bgColor: 'var(--danger-pale)',
+        title: `Compliance rate is ${compPct}% — below 80% target`,
+        description: `${nonCompliant} device(s) are non-compliant. Review compliance policies and remediate affected devices.`,
+        severity: 'high',
+        action: "Devices.complianceFilter='noncompliant'; Router.navigate('devices');"
+      });
+    }
+
+    // Low encryption coverage
+    if (encPct < 90) {
+      recs.push({
+        icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+        bgColor: 'var(--warning-pale)',
+        title: `Only ${encPct}% of devices are encrypted`,
+        description: `${total - encrypted} device(s) lack encryption. Deploy BitLocker/FileVault policies for full coverage.`,
+        severity: encPct < 70 ? 'high' : 'medium',
+        action: "Router.navigate('security');"
+      });
+    }
+
+    // Stale devices
+    if (stale > 0) {
+      recs.push({
+        icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        bgColor: 'var(--warning-pale)',
+        title: `${stale} stale device(s) detected`,
+        description: `These devices haven't synced in 7+ days. They may be offline, decommissioned, or have connectivity issues.`,
+        severity: stale > 5 ? 'high' : 'medium',
+        action: "Router.navigate('devices');"
+      });
+    }
+
+    // No conditional access policies
+    const caPolicies = AppState.getForContext('caPolicies');
+    if (caPolicies.length === 0 && tenants.length > 0) {
+      recs.push({
+        icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>',
+        bgColor: 'var(--primary-pale)',
+        title: 'No Conditional Access policies found',
+        description: 'Consider deploying MFA and device compliance CA policies to improve security posture.',
+        severity: 'medium',
+        action: "PolicyWizard.show();"
+      });
+    }
+
+    // Multi-tenant inconsistency check
+    if (tenants.length > 1) {
+      const tenantCompliance = tenants.map(t => {
+        const devs = AppState.get('devices')[t.id] || [];
+        const comp = devs.filter(d => d.complianceState === 'compliant').length;
+        return { name: t.displayName, pct: devs.length ? Math.round((comp / devs.length) * 100) : 100 };
+      });
+      const min = Math.min(...tenantCompliance.map(t => t.pct));
+      const max = Math.max(...tenantCompliance.map(t => t.pct));
+      if (max - min > 20) {
+        const worst = tenantCompliance.find(t => t.pct === min);
+        recs.push({
+          icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+          bgColor: 'var(--info-pale)',
+          title: 'Cross-tenant compliance variance detected',
+          description: `${worst?.name} has ${min}% compliance vs ${max}% in other tenants. Standardize policies across tenants.`,
+          severity: 'low',
+          action: "Router.navigate('comparison');"
+        });
+      }
+    }
+
+    // All good!
+    if (recs.length === 0) {
+      recs.push({
+        icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        bgColor: 'var(--success-pale)',
+        title: 'Fleet health looks great!',
+        description: 'All devices are compliant, encrypted, and recently synced. Keep up the good work.',
+        severity: 'low',
+        action: null
+      });
+    }
+
+    return recs.slice(0, 5);
   }
 };
