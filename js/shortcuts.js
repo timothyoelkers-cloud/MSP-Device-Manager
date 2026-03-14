@@ -31,6 +31,7 @@ const Shortcuts = {
     h: { page: 'scorecard',        label: 'Security Scorecard' },
     j: { page: 'activityfeed',     label: 'Activity Feed' },
     q: { page: 'exportcenter',     label: 'Data Export' },
+    z: { page: 'devicecompare',   label: 'Device Compare' },
   },
 
   init() {
@@ -146,6 +147,7 @@ const Shortcuts = {
       { keys: 'g then h',    desc: 'Go to Security Scorecard' },
       { keys: 'g then j',    desc: 'Go to Activity Feed' },
       { keys: 'g then q',    desc: 'Go to Data Export' },
+      { keys: 'g then z',    desc: 'Go to Device Compare' },
       { keys: '/ or Ctrl+K', desc: 'Focus search input' },
       { keys: 'Escape',      desc: 'Close modal / panel' },
       { keys: 'n',           desc: 'Connect new tenant' }

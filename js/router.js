@@ -33,6 +33,14 @@ const Router = {
     'clientreports': ['Multi-Tenant', 'Client Reports'],
     'scriptrunner': ['Tools', 'Script Runner'],
     'exportcenter': ['Tools', 'Data Export'],
+    'devicecompare': ['Device Management', 'Device Compare'],
+    'remediation': ['Device Management', 'Compliance Remediation'],
+    'mfareport': ['Security & Compliance', 'MFA Report'],
+    'assettracking': ['Device Management', 'Asset Tracking'],
+    'notifprefs': ['Settings', 'Notification Preferences'],
+    'healthchecks': ['Multi-Tenant', 'Health Checks'],
+    'devicetags': ['Device Management', 'Device Tags'],
+    'policydrift': ['Multi-Tenant', 'Policy Drift'],
     'settings': ['Settings'],
     'webhooks': ['Settings', 'Webhooks'],
     'rbac': ['Settings', 'Access Control'],
@@ -71,6 +79,14 @@ const Router = {
     'clientreports':   () => ClientReports.render(),
     'scriptrunner':    () => ScriptRunner.render(),
     'exportcenter':    () => ExportCenter.render(),
+    'devicecompare':   () => DeviceCompare.render(),
+    'remediation':     () => Remediation.render(),
+    'mfareport':       () => MFAReport.render(),
+    'assettracking':   () => AssetTracking.render(),
+    'notifprefs':      () => NotifPrefs.render(),
+    'healthchecks':    () => HealthChecks.render(),
+    'devicetags':      () => DeviceTags.render(),
+    'policydrift':     () => PolicyDrift.render(),
     'settings':        () => Router.renderSettings(),
   },
 
@@ -235,12 +251,19 @@ const Router = {
       </div>
 
       <!-- Settings Quick Links -->
-      <div class="grid grid-3 gap-4 mt-6">
+      <div class="grid grid-4 gap-4 mt-6">
         <div class="card card-interactive" onclick="Router.navigate('webhooks')">
           <div class="card-body-compact" style="text-align:center;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin:0 auto 8px;display:block;"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
             <div class="fw-500 text-sm">Webhooks & Notifications</div>
             <div class="text-xs text-muted">Configure alert delivery</div>
+          </div>
+        </div>
+        <div class="card card-interactive" onclick="Router.navigate('notifprefs')">
+          <div class="card-body-compact" style="text-align:center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin:0 auto 8px;display:block;"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            <div class="fw-500 text-sm">Notification Preferences</div>
+            <div class="text-xs text-muted">Choose what alerts you see</div>
           </div>
         </div>
         <div class="card card-interactive" onclick="Router.navigate('rbac')">

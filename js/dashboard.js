@@ -742,6 +742,45 @@ const Dashboard = {
         </div>
       ` : ''}
 
+      <!-- ======== Visual Analytics (Charts) ======== -->
+      ${tenants.length > 0 && total > 0 && typeof Charts !== 'undefined' ? `
+        <div class="grid grid-3 gap-4 mb-6">
+          <div class="card animate-fade-up">
+            <div class="card-header"><div class="card-header-title">Compliance Breakdown</div></div>
+            <div class="card-body" style="display:flex;justify-content:center;">
+              ${Charts.donut([
+                { label: 'Compliant', value: compliant, color: 'var(--success)' },
+                { label: 'Non-Compliant', value: nonCompliant, color: 'var(--danger)' },
+                { label: 'Unknown', value: unknown, color: 'var(--gray-400)' }
+              ], { size: 140, thickness: 24, centerLabel: compPct + '%', centerSub: 'Compliant' })}
+            </div>
+          </div>
+          <div class="card animate-fade-up">
+            <div class="card-header"><div class="card-header-title">Platform Mix</div></div>
+            <div class="card-body" style="display:flex;justify-content:center;">
+              ${Charts.donut(
+                osEntries.map(([label, count]) => ({
+                  label,
+                  value: count,
+                  color: osColors[label] || 'var(--gray-400)'
+                })),
+                { size: 140, thickness: 24, centerLabel: total, centerSub: 'Devices' }
+              )}
+            </div>
+          </div>
+          <div class="card animate-fade-up">
+            <div class="card-header"><div class="card-header-title">Encryption & Sync</div></div>
+            <div class="card-body">
+              ${Charts.barH([
+                { label: 'Encrypted', value: allDevices.filter(d => d.isEncrypted).length, color: 'var(--success)', maxLabel: allDevices.filter(d => d.isEncrypted).length + '/' + total },
+                { label: 'Synced (7d)', value: allDevices.filter(d => d.lastSyncDateTime && (now - new Date(d.lastSyncDateTime).getTime()) < sevenDays).length, color: 'var(--primary)', maxLabel: allDevices.filter(d => d.lastSyncDateTime && (now - new Date(d.lastSyncDateTime).getTime()) < sevenDays).length + '/' + total },
+                { label: 'Compliant', value: compliant, color: 'var(--secondary)', maxLabel: compliant + '/' + total },
+              ], { max: total })}
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- ======== Policy Wizard Quick Launch ======== -->
       ${tenants.length > 0 ? `
         <div class="card animate-fade-up mb-6" style="background:linear-gradient(135deg, var(--primary-bg), var(--secondary-pale));border-color:var(--primary-pale);">

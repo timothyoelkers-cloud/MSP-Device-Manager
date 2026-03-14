@@ -162,6 +162,38 @@
               Endpoint Security
             </a>
           </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="remediation" onclick="Router.navigate('remediation')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+              </span>
+              Remediation
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="devicecompare" onclick="Router.navigate('devicecompare')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="8" height="14" rx="1"/><rect x="14" y="3" width="8" height="14" rx="1"/><line x1="6" y1="21" x2="18" y2="21"/></svg>
+              </span>
+              Device Compare
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="devicetags" onclick="Router.navigate('devicetags')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              </span>
+              Device Tags
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="assettracking" onclick="Router.navigate('assettracking')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+              </span>
+              Asset Tracking
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -274,6 +306,14 @@
               Remediations
             </a>
           </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="mfareport" onclick="Router.navigate('mfareport')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+              </span>
+              MFA Report
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -354,6 +394,22 @@
               Client Reports
             </a>
           </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="healthchecks" onclick="Router.navigate('healthchecks')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </span>
+              Health Checks
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="policydrift" onclick="Router.navigate('policydrift')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M11 18H8a2 2 0 01-2-2V9"/></svg>
+              </span>
+              Policy Drift
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -416,6 +472,14 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
               </span>
               Custom Branding
+            </a>
+          </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="notifprefs" onclick="Router.navigate('notifprefs')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </span>
+              Alert Preferences
             </a>
           </li>
         </ul>
@@ -601,6 +665,15 @@
   <script src="js/clientreports.js"></script>
   <script src="js/scriptrunner.js"></script>
   <script src="js/exportcenter.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/devicecompare.js"></script>
+  <script src="js/remediation.js"></script>
+  <script src="js/mfareport.js"></script>
+  <script src="js/assettracking.js"></script>
+  <script src="js/notifprefs.js"></script>
+  <script src="js/healthchecks.js"></script>
+  <script src="js/devicetags.js"></script>
+  <script src="js/policydrift.js"></script>
   <script src="js/branding.js"></script>
   <script src="js/licensing.js"></script>
   <script src="js/sponsor.js"></script>
