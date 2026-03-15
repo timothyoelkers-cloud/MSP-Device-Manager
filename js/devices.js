@@ -855,7 +855,9 @@ const Devices = {
         }
         case 'bitlocker': {
           Toast.show('Retrieving BitLocker recovery keys...', 'info');
-          const keys = await Graph.getBitLockerKeys(tenantId, deviceId);
+          const azureDeviceId = device?.azureADDeviceId;
+          if (!azureDeviceId) { Toast.show('No Azure AD Device ID available — cannot retrieve BitLocker keys', 'warning'); return; }
+          const keys = await Graph.getBitLockerKeys(tenantId, azureDeviceId);
           if (keys?.value?.length) {
             this._showBitLockerModal(name, keys.value);
           } else {
