@@ -31,7 +31,16 @@ const Shortcuts = {
     h: { page: 'scorecard',        label: 'Security Scorecard' },
     j: { page: 'activityfeed',     label: 'Activity Feed' },
     q: { page: 'exportcenter',     label: 'Data Export' },
-    z: { page: 'devicecompare',   label: 'Device Compare' },
+    z: { page: 'devicecompare',    label: 'Device Compare' },
+    '1': { page: 'remediation',    label: 'Remediation' },
+    '2': { page: 'mfareport',      label: 'MFA Report' },
+    '3': { page: 'assettracking',  label: 'Asset Tracking' },
+    '4': { page: 'healthchecks',   label: 'Health Checks' },
+    '5': { page: 'devicetags',     label: 'Device Tags' },
+    '6': { page: 'policydrift',    label: 'Policy Drift' },
+    '7': { page: 'tenantgroups',   label: 'Tenant Groups' },
+    '8': { page: 'clientreports',  label: 'Client Reports' },
+    '9': { page: 'scriptrunner',   label: 'Script Runner' },
   },
 
   init() {
@@ -44,17 +53,21 @@ const Shortcuts = {
   },
 
   _handleKey(e) {
-    // Never intercept when typing in form fields
-    if (this._isTyping(e)) return;
-
     const key = e.key;
 
-    // Ctrl+K — Focus search
+    // Ctrl+K — Command Palette (always, even in input fields)
     if ((e.ctrlKey || e.metaKey) && key === 'k') {
       e.preventDefault();
-      this._focusSearch();
+      if (typeof CommandPalette !== 'undefined') {
+        CommandPalette.show();
+      } else {
+        this._focusSearch();
+      }
       return;
     }
+
+    // Never intercept other shortcuts when typing in form fields
+    if (this._isTyping(e)) return;
 
     // Don't process other shortcuts if modifier keys are held
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -107,17 +120,24 @@ const Shortcuts = {
   },
 
   _closeModals() {
+    // Close command palette first
+    if (typeof CommandPalette !== 'undefined' && CommandPalette._visible) {
+      CommandPalette.hide();
+      return;
+    }
     // Close any visible modal overlays
     document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(el => {
+      if (el.id === 'accessGate') return;
       el.classList.add('hidden');
+    });
+    // Remove dynamic modals
+    ['confirmDialog', 'shortcutsHelpModal', 'cmdPalette', 'widgetCustomizer', 'tgModal', 'dtTagModal', 'dtBulkModal'].forEach(id => {
+      document.getElementById(id)?.remove();
     });
     // Close any open detail panels
     document.querySelectorAll('.detail-panel.open').forEach(el => {
       el.classList.remove('open');
     });
-    // Close shortcuts help if open
-    const help = document.getElementById('shortcutsHelpModal');
-    if (help) help.remove();
   },
 
   showHelp() {
@@ -127,6 +147,7 @@ const Shortcuts = {
 
     const shortcuts = [
       { keys: '?',           desc: 'Show this help' },
+      { keys: 'Ctrl+K',      desc: 'Command palette' },
       { keys: 'g then d',    desc: 'Go to Dashboard' },
       { keys: 'g then t',    desc: 'Go to Tenants' },
       { keys: 'g then v',    desc: 'Go to Devices' },
@@ -148,7 +169,14 @@ const Shortcuts = {
       { keys: 'g then j',    desc: 'Go to Activity Feed' },
       { keys: 'g then q',    desc: 'Go to Data Export' },
       { keys: 'g then z',    desc: 'Go to Device Compare' },
-      { keys: '/ or Ctrl+K', desc: 'Focus search input' },
+      { keys: 'g then 1',    desc: 'Go to Remediation' },
+      { keys: 'g then 2',    desc: 'Go to MFA Report' },
+      { keys: 'g then 3',    desc: 'Go to Asset Tracking' },
+      { keys: 'g then 4',    desc: 'Go to Health Checks' },
+      { keys: 'g then 5',    desc: 'Go to Device Tags' },
+      { keys: 'g then 6',    desc: 'Go to Policy Drift' },
+      { keys: 'g then 7',    desc: 'Go to Tenant Groups' },
+      { keys: '/ or Ctrl+K', desc: 'Focus search / command palette' },
       { keys: 'Escape',      desc: 'Close modal / panel' },
       { keys: 'n',           desc: 'Connect new tenant' }
     ];

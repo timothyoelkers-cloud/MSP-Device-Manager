@@ -768,22 +768,22 @@ const Devices = {
           Toast.show(`Sync initiated for ${name}`, 'success');
           break;
         case 'restart':
-          if (!confirm(`Restart ${name}?`)) return;
+          if (!await Confirm.show({ title: 'Restart Device', message: `Send restart command to <strong>${name}</strong>?`, confirmText: 'Restart', type: 'warning' })) return;
           await Graph.restartDevice(tenantId, deviceId);
           Toast.show(`Restart command sent to ${name}`, 'success');
           break;
         case 'lock':
-          if (!confirm(`Lock ${name}?`)) return;
+          if (!await Confirm.show({ title: 'Lock Device', message: `Remotely lock <strong>${name}</strong>?`, confirmText: 'Lock', type: 'warning' })) return;
           await Graph.lockDevice(tenantId, deviceId);
           Toast.show(`Lock command sent to ${name}`, 'success');
           break;
         case 'retire':
-          if (!confirm(`Retire ${name}? This will remove company data.`)) return;
+          if (!await Confirm.show({ title: 'Retire Device', message: `Retire <strong>${name}</strong>? This will remove all company data from the device.`, confirmText: 'Retire', type: 'danger' })) return;
           await Graph.retireDevice(tenantId, deviceId);
           Toast.show(`Retire command sent to ${name}`, 'warning');
           break;
         case 'wipe':
-          if (!confirm(`WIPE ${name}? This will factory reset the device. This cannot be undone!`)) return;
+          if (!await Confirm.show({ title: 'Wipe Device', message: `Factory reset <strong>${name}</strong>? This will erase ALL data on the device. <strong>This cannot be undone!</strong>`, confirmText: 'Wipe Device', type: 'danger' })) return;
           await Graph.wipeDevice(tenantId, deviceId);
           Toast.show(`Wipe command sent to ${name}`, 'warning');
           break;
@@ -804,7 +804,7 @@ const Devices = {
           break;
         }
         case 'defenderScan': {
-          const quickScan = confirm(`Run a quick scan on ${name}?\n\nOK = Quick Scan\nCancel = Full Scan`);
+          const quickScan = await Confirm.show({ title: 'Defender Scan', message: `Run a <strong>quick scan</strong> on ${name}?<br>Click Cancel for a full scan instead.`, confirmText: 'Quick Scan', cancelText: 'Full Scan', type: 'info' });
           await Graph.windowsDefenderScan(tenantId, deviceId, quickScan);
           Toast.show(`Defender ${quickScan ? 'quick' : 'full'} scan initiated on ${name}`, 'success');
           break;
@@ -814,14 +814,14 @@ const Devices = {
           Toast.show(`Defender signature update initiated on ${name}`, 'success');
           break;
         case 'freshStart': {
-          if (!confirm(`Fresh Start ${name}? This will reinstall Windows and may remove apps.`)) return;
-          const keepUserData = confirm(`Keep user data on ${name}?\n\nOK = Keep user data\nCancel = Remove user data`);
+          if (!await Confirm.show({ title: 'Fresh Start', message: `Reinstall Windows on <strong>${name}</strong>? This may remove installed apps.`, confirmText: 'Fresh Start', type: 'danger' })) return;
+          const keepUserData = await Confirm.show({ title: 'Keep User Data?', message: 'Do you want to preserve user data during the fresh start?', confirmText: 'Keep Data', cancelText: 'Remove Data', type: 'info' });
           await Graph.freshStart(tenantId, deviceId, keepUserData);
           Toast.show(`Fresh Start initiated on ${name} (${keepUserData ? 'keeping' : 'removing'} user data)`, 'warning');
           break;
         }
         case 'shutdown':
-          if (!confirm(`Shutdown ${name}?`)) return;
+          if (!await Confirm.show({ title: 'Shutdown Device', message: `Shut down <strong>${name}</strong>?`, confirmText: 'Shutdown', type: 'warning' })) return;
           await Graph.shutdownDevice(tenantId, deviceId);
           Toast.show(`Shutdown command sent to ${name}`, 'success');
           break;
@@ -850,11 +850,37 @@ const Devices = {
   async bulkAction(type) {
     const selected = AppState.get('selectedDevices');
     if (!selected.length) return;
-    if (!confirm(`${type.charAt(0).toUpperCase() + type.slice(1)} ${selected.length} device(s)?`)) return;
+
+    const actionLabel = type.charAt(0).toUpperCase() + type.slice(1);
+    const isDangerous = ['retire', 'wipe', 'freshStart'].includes(type);
+    const ok = await Confirm.show({
+      title: `Bulk ${actionLabel}`,
+      message: `${actionLabel} <strong>${selected.length}</strong> device(s)?${isDangerous ? ' <br><strong>This action may be irreversible.</strong>' : ''}`,
+      confirmText: `${actionLabel} All`,
+      type: isDangerous ? 'danger' : 'warning'
+    });
+    if (!ok) return;
 
     const allDevices = AppState.getDevicesForContext();
-    let success = 0, fail = 0;
+    const items = selected.map(id => {
+      const d = allDevices.find(x => x.id === id);
+      return { id, label: d?.deviceName || id, _tenantId: d?._tenantId };
+    });
 
+    // Use BulkProgress tracker if available
+    if (typeof BulkProgress !== 'undefined') {
+      await BulkProgress.run(`${actionLabel} Devices`, items, async (item) => {
+        await this.action(type, item._tenantId, item.id);
+        return 'Done';
+      }, () => {
+        AppState.set('selectedDevices', []);
+        this.render();
+      });
+      return;
+    }
+
+    // Fallback: simple loop
+    let success = 0, fail = 0;
     for (const deviceId of selected) {
       const device = allDevices.find(d => d.id === deviceId);
       if (!device) continue;

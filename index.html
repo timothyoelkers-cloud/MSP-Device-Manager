@@ -102,6 +102,10 @@
 
     <!-- Sidebar Navigation -->
     <nav class="sidebar" id="sidebar">
+      <!-- Favorites (populated dynamically) -->
+      <div class="sidebar-section" id="favoritesSidebarSection" style="display:none;"></div>
+      <div class="sidebar-divider" id="favoritesDivider" style="display:none;"></div>
+
       <div class="sidebar-section">
         <div class="sidebar-section-title">Overview</div>
         <ul class="sidebar-nav">
@@ -482,6 +486,14 @@
               Alert Preferences
             </a>
           </li>
+          <li class="sidebar-nav-item">
+            <a class="sidebar-nav-link" data-page="tenantgroups" onclick="Router.navigate('tenantgroups')">
+              <span class="sidebar-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              </span>
+              Tenant Groups
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -628,6 +640,9 @@
        JAVASCRIPT MODULES
        ============================================================ -->
   <script src="js/state.js"></script>
+  <script src="js/confirm.js"></script>
+  <script src="js/tablehelper.js"></script>
+  <script src="js/formvalidation.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/router.js"></script>
   <script src="js/graph.js"></script>
@@ -674,6 +689,13 @@
   <script src="js/healthchecks.js"></script>
   <script src="js/devicetags.js"></script>
   <script src="js/policydrift.js"></script>
+  <script src="js/commandpalette.js"></script>
+  <script src="js/favorites.js"></script>
+  <script src="js/sessiontimeout.js"></script>
+  <script src="js/bulkprogress.js"></script>
+  <script src="js/tenantgroups.js"></script>
+  <script src="js/dashboardwidgets.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/branding.js"></script>
   <script src="js/licensing.js"></script>
   <script src="js/sponsor.js"></script>
@@ -763,6 +785,17 @@
     window.addEventListener('DOMContentLoaded', async () => {
       if (sessionStorage.getItem('msp_gate_passed') === '1') {
         Router.init();
+
+        // Initialize session timeout
+        if (typeof SessionTimeout !== 'undefined') SessionTimeout.init();
+
+        // Render favorites sidebar
+        if (typeof Favorites !== 'undefined') {
+          Favorites.renderSidebar();
+          // Show/hide favorites divider
+          const favDiv = document.getElementById('favoritesDivider');
+          if (favDiv && Favorites.get().length > 0) favDiv.style.display = '';
+        }
 
         // Auto-reload data for persisted tenants after auth is ready
         const tenants = AppState.get('tenants');

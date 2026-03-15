@@ -294,6 +294,12 @@ const Dashboard = {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             ${tenants.length > 0 ? 'Add Tenant' : 'Connect Tenant'}
           </button>
+          ${typeof DashboardWidgets !== 'undefined' ? `
+            <button class="btn btn-ghost btn-sm" onclick="DashboardWidgets.showCustomizer()" title="Customize Dashboard">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+            </button>
+          ` : ''}
+          ${typeof Favorites !== 'undefined' ? Favorites.starButton('dashboard') : ''}
         </div>
       </div>
 

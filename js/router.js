@@ -41,6 +41,7 @@ const Router = {
     'healthchecks': ['Multi-Tenant', 'Health Checks'],
     'devicetags': ['Device Management', 'Device Tags'],
     'policydrift': ['Multi-Tenant', 'Policy Drift'],
+    'tenantgroups': ['Settings', 'Tenant Groups'],
     'settings': ['Settings'],
     'webhooks': ['Settings', 'Webhooks'],
     'rbac': ['Settings', 'Access Control'],
@@ -87,7 +88,8 @@ const Router = {
     'healthchecks':    () => HealthChecks.render(),
     'devicetags':      () => DeviceTags.render(),
     'policydrift':     () => PolicyDrift.render(),
-    'settings':        () => Router.renderSettings(),
+    'tenantgroups':    () => TenantGroups.render(),
+    'settings':        () => Settings.render(),
   },
 
   init() {
@@ -137,6 +139,9 @@ const Router = {
     document.getElementById('sidebar')?.classList.remove('open');
     document.getElementById('sidebarOverlay')?.classList.remove('visible');
 
+    // Update favorites sidebar
+    if (typeof Favorites !== 'undefined') Favorites.renderSidebar();
+
     // Render page
     const renderFn = this.routes[page];
     if (renderFn) {
@@ -178,119 +183,8 @@ const Router = {
     `;
   },
 
+  // Legacy — now delegated to Settings module
   renderSettings() {
-    const main = document.getElementById('mainContent');
-    const tier = AppState.get('licenseTier');
-    const tenants = AppState.get('tenants');
-    main.innerHTML = `
-      <div class="page-header">
-        <div class="page-header-left">
-          <h1 class="page-title">Settings</h1>
-          <p class="page-subtitle">Manage your account, connections, and license.</p>
-        </div>
-      </div>
-
-      <div class="grid grid-2 gap-6">
-        <!-- Connection Settings -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-header-title">Tenant Connections</div>
-              <div class="card-header-subtitle">${tenants.length} tenant(s) connected</div>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="Auth.showConnectModal()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Tenant
-            </button>
-          </div>
-          <div class="card-body">
-            ${tenants.length === 0 ? `
-              <div class="empty-state" style="padding: 2rem 1rem;">
-                <p class="text-sm text-muted">No tenants connected. Click "Add Tenant" or connect via Partner Center.</p>
-              </div>
-            ` : tenants.map(t => `
-              <div class="flex items-center justify-between py-2" style="border-bottom: 1px solid var(--border-light);">
-                <div>
-                  <div class="fw-500">${t.displayName}</div>
-                  <div class="text-xs text-muted text-mono">${t.id}</div>
-                </div>
-                <span class="badge badge-success">Connected</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- License Settings -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-header-title">License</div>
-              <div class="card-header-subtitle">Current plan: <strong>${tier === 'pro' ? 'Pro' : 'Free'}</strong></div>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="tier-banner ${tier}">
-              <div class="tier-banner-text">
-                ${tier === 'pro' ? `
-                  <strong>Pro License Active</strong> — Unlimited tenants, all features unlocked.
-                ` : `
-                  <strong>Free Tier</strong> — Limited to ${AppState.get('maxTenantsForFree')} tenants. <a href="#" onclick="Licensing.showModal(); return false;">Upgrade to Pro</a> for unlimited access.
-                `}
-              </div>
-            </div>
-            ${tier === 'free' ? `
-              <button class="btn btn-primary w-full mt-4" onclick="Licensing.showModal()">Enter License Key</button>
-            ` : `
-              <div class="flex items-center gap-2 mt-4">
-                <span class="badge badge-success">License Active</span>
-                <span class="text-xs text-mono text-muted">${AppState.get('licenseKey') || ''}</span>
-              </div>
-            `}
-          </div>
-        </div>
-      </div>
-
-      <!-- Settings Quick Links -->
-      <div class="grid grid-4 gap-4 mt-6">
-        <div class="card card-interactive" onclick="Router.navigate('webhooks')">
-          <div class="card-body-compact" style="text-align:center;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin:0 auto 8px;display:block;"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-            <div class="fw-500 text-sm">Webhooks & Notifications</div>
-            <div class="text-xs text-muted">Configure alert delivery</div>
-          </div>
-        </div>
-        <div class="card card-interactive" onclick="Router.navigate('notifprefs')">
-          <div class="card-body-compact" style="text-align:center;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin:0 auto 8px;display:block;"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-            <div class="fw-500 text-sm">Notification Preferences</div>
-            <div class="text-xs text-muted">Choose what alerts you see</div>
-          </div>
-        </div>
-        <div class="card card-interactive" onclick="Router.navigate('rbac')">
-          <div class="card-body-compact" style="text-align:center;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin:0 auto 8px;display:block;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <div class="fw-500 text-sm">Access Control</div>
-            <div class="text-xs text-muted">Manage roles & permissions</div>
-          </div>
-        </div>
-        <div class="card card-interactive" onclick="Router.navigate('branding')">
-          <div class="card-body-compact" style="text-align:center;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin:0 auto 8px;display:block;"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <div class="fw-500 text-sm">Custom Branding</div>
-            <div class="text-xs text-muted">White-label the app</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Sponsor Section -->
-      <div class="sponsor-banner mt-6">
-        <span class="sponsor-banner-icon">&#9829;</span>
-        <div class="sponsor-banner-content">
-          <div class="sponsor-banner-title">Support MSP Device Manager</div>
-          <div class="sponsor-banner-text">If this tool saves you time, consider sponsoring the project to keep it maintained and free for the community.</div>
-        </div>
-        <a href="https://github.com/sponsors/timothyoelkers-cloud" target="_blank" class="btn btn-primary btn-sm">Sponsor on GitHub</a>
-      </div>
-    `;
+    if (typeof Settings !== 'undefined') return Settings.render();
   }
 };

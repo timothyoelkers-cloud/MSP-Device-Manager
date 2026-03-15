@@ -1285,3 +1285,170 @@
   background: var(--surface-raised) !important;
   color: var(--ink);
 }
+
+/* --- Form Validation Errors --- */
+.form-input-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+}
+.form-input-error:focus {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+.form-error-msg {
+  color: var(--danger);
+  font-size: 11px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Favorites sidebar hover for unpin --- */
+.sidebar-nav-link:hover .fav-unpin {
+  opacity: 1 !important;
+}
+
+/* --- Animations --- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+  .page-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .table-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .table-toolbar-left,
+  .table-toolbar-right {
+    width: 100%;
+  }
+  .table-search {
+    width: 100%;
+  }
+  .table-search input {
+    width: 100%;
+  }
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table {
+    min-width: 600px;
+  }
+  .table-pagination {
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  .modal {
+    max-width: 95vw !important;
+    margin: 16px;
+  }
+  .modal-overlay {
+    padding: 16px;
+  }
+  .detail-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .stat-card {
+    padding: 12px;
+  }
+  .stat-card-value {
+    font-size: 24px;
+  }
+  .flex.gap-3, .flex.gap-4, .flex.gap-6 {
+    flex-wrap: wrap;
+  }
+  .topbar-version {
+    display: none;
+  }
+  .topbar-logo-text span {
+    display: none;
+  }
+  .topbar-tenant-selector .tenant-name {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-body-compact {
+    padding: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-tenant-selector {
+    display: none;
+  }
+  .page-title {
+    font-size: var(--text-xl);
+  }
+  .btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+/* --- Card Interactive States --- */
+.card-interactive {
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+.card-interactive:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+  transform: translateY(-1px);
+}
+
+/* --- Command Palette --- */
+[data-theme="dark"] #cmdPalette > div {
+  background: var(--surface);
+  border-color: var(--border);
+}
+[data-theme="dark"] #cmdPaletteInput {
+  color: var(--ink);
+}
+
+/* --- Bulk Progress Panel dark mode --- */
+[data-theme="dark"] #bulkProgressPanel {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* --- Confirm Dialog dark mode --- */
+[data-theme="dark"] #confirmDialog .modal {
+  background: var(--surface);
+}
+
+/* --- Session Warning dark mode --- */
+[data-theme="dark"] #sessionWarning {
+  background: var(--surface);
+  border-color: var(--warning);
+}
