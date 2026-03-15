@@ -6,8 +6,37 @@ const Graph = {
   baseUrl: 'https://graph.microsoft.com/v1.0',
   betaUrl: 'https://graph.microsoft.com/beta',
 
-  // Generic Graph API call
+  // Auto-refresh configuration
+  _refreshInterval: null,
+  _refreshMinutes: 0,
+
+  // Generic Graph API call with retry logic
   async call(tenantId, endpoint, options = {}) {
+    const maxRetries = options.retries ?? 2;
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this._doCall(tenantId, endpoint, options);
+      } catch (err) {
+        lastError = err;
+        // Don't retry auth errors or client errors (4xx except 429)
+        if (err.isAuthError || (err.statusCode && err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429)) {
+          throw err;
+        }
+        // Retry with exponential backoff for 429 (throttled) and 5xx
+        if (attempt < maxRetries) {
+          const delay = err.statusCode === 429
+            ? (err.retryAfter || (2 ** attempt * 2)) * 1000
+            : 2 ** attempt * 1000;
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+    throw lastError;
+  },
+
+  async _doCall(tenantId, endpoint, options = {}) {
     const token = await Auth.getToken(tenantId);
     if (!token) {
       const err = new Error('No access token for tenant ' + tenantId);
@@ -28,9 +57,7 @@ const Graph = {
 
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({}));
-      // 401 = token expired/invalid, trigger reconnect
       if (response.status === 401) {
-        // Clear the stale token
         const tokens = { ...AppState.get('accessTokens') };
         delete tokens[tenantId];
         AppState.set('accessTokens', tokens);
@@ -39,11 +66,64 @@ const Graph = {
         err.isAuthError = true;
         throw err;
       }
-      throw new Error(errBody.error?.message || `Graph API error ${response.status}`);
+      const err = new Error(errBody.error?.message || `Graph API error ${response.status}`);
+      err.statusCode = response.status;
+      if (response.status === 429) {
+        err.retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
+      }
+      throw err;
     }
 
     if (response.status === 204) return null;
     return response.json();
+  },
+
+  // Batch API — send up to 20 requests in a single call
+  async batch(tenantId, requests, options = {}) {
+    const batchSize = 20;
+    const allResponses = [];
+
+    for (let i = 0; i < requests.length; i += batchSize) {
+      const chunk = requests.slice(i, i + batchSize).map((req, idx) => ({
+        id: String(i + idx + 1),
+        method: req.method || 'GET',
+        url: req.url,
+        ...(req.body ? { body: req.body, headers: { 'Content-Type': 'application/json' } } : {})
+      }));
+
+      const result = await this.call(tenantId, '/$batch', {
+        method: 'POST',
+        body: { requests: chunk },
+        beta: options.beta,
+        retries: 1
+      });
+
+      if (result?.responses) {
+        allResponses.push(...result.responses);
+      }
+    }
+
+    return allResponses.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+  },
+
+  // Auto-refresh management
+  startAutoRefresh(minutes) {
+    this.stopAutoRefresh();
+    if (minutes <= 0) return;
+    this._refreshMinutes = minutes;
+    this._refreshInterval = setInterval(() => {
+      const tenants = AppState.get('tenants');
+      if (tenants.length === 0) return;
+      tenants.forEach(t => this.loadAllData(t.id).catch(() => {}));
+    }, minutes * 60 * 1000);
+  },
+
+  stopAutoRefresh() {
+    if (this._refreshInterval) {
+      clearInterval(this._refreshInterval);
+      this._refreshInterval = null;
+    }
+    this._refreshMinutes = 0;
   },
 
   // Paginated fetch — follows @odata.nextLink
@@ -274,7 +354,30 @@ const Graph = {
   },
 
   async getBitLockerKeys(tenantId, deviceId) {
-    return await this.call(tenantId, `/informationProtection/bitlocker/recoveryKeys?$filter=deviceId eq '${deviceId}'`, { beta: true });
+    // First try the beta recoveryKeys endpoint with odata.filter
+    try {
+      const result = await this.call(tenantId, `/informationProtection/bitlocker/recoveryKeys?$filter=deviceId eq '${encodeURIComponent(deviceId)}'`, { beta: true });
+      if (result?.value?.length > 0) {
+        // Fetch the actual key values (requires separate call per key)
+        const keys = [];
+        for (const key of result.value) {
+          try {
+            const detail = await this.call(tenantId, `/informationProtection/bitlocker/recoveryKeys/${key.id}?$select=key`, { beta: true });
+            keys.push({ id: key.id, key: detail?.key || 'Unable to retrieve', volumeType: key.volumeType, createdDateTime: key.createdDateTime });
+          } catch {
+            keys.push({ id: key.id, key: 'Access denied — requires BitLockerKey.Read.All', volumeType: key.volumeType, createdDateTime: key.createdDateTime });
+          }
+        }
+        return { value: keys };
+      }
+      return result;
+    } catch (err) {
+      // Fallback: check if it's a permission issue
+      if (err.statusCode === 403) {
+        throw new Error('BitLocker key retrieval requires the BitLockerKey.Read.All permission. Grant this in your App Registration.');
+      }
+      throw err;
+    }
   },
 
   async getDeviceCompliance(tenantId, deviceId) {
@@ -336,7 +439,26 @@ const Graph = {
   },
 
   async getDeviceInstalledApps(tenantId, deviceId) {
-    return await this.callPaged(tenantId, `/deviceManagement/managedDevices/${deviceId}/detectedApps`);
+    // Try detectedApps first (works for most devices)
+    try {
+      const apps = await this.callPaged(tenantId, `/deviceManagement/managedDevices/${deviceId}/detectedApps`);
+      if (apps && apps.length > 0) return apps;
+    } catch {}
+    // Fallback to beta managedDevices detail with expand
+    try {
+      const result = await this.call(tenantId, `/deviceManagement/managedDevices/${deviceId}?$expand=detectedApps`, { beta: true });
+      return result?.detectedApps || [];
+    } catch {}
+    return [];
+  },
+
+  async getDeviceGroupMemberships(tenantId, azureAdDeviceId) {
+    if (!azureAdDeviceId) return [];
+    try {
+      const devices = await this.callPaged(tenantId, `/devices?$filter=deviceId eq '${encodeURIComponent(azureAdDeviceId)}'&$expand=memberOf($select=id,displayName,groupTypes)`);
+      if (devices?.length > 0 && devices[0].memberOf) return devices[0].memberOf;
+    } catch {}
+    return [];
   },
 
   async getDeviceConfigStates(tenantId, deviceId) {

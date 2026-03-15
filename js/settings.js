@@ -3,6 +3,58 @@
    ============================================================ */
 
 const Settings = {
+  _toggleAutoRefresh(enabled) {
+    if (enabled) {
+      const mins = parseInt(localStorage.getItem('msp_auto_refresh_mins') || '15');
+      if (typeof Graph !== 'undefined' && Graph.startAutoRefresh) {
+        Graph.startAutoRefresh(mins);
+        localStorage.setItem('msp_auto_refresh_enabled', 'true');
+        Toast.show(`Auto-refresh enabled every ${mins} minutes`, 'success');
+      }
+    } else {
+      if (typeof Graph !== 'undefined' && Graph.stopAutoRefresh) {
+        Graph.stopAutoRefresh();
+        localStorage.setItem('msp_auto_refresh_enabled', 'false');
+        Toast.show('Auto-refresh disabled', 'info');
+      }
+    }
+    const status = document.getElementById('autoRefreshStatus');
+    if (status) status.textContent = enabled ? 'Auto-refresh is active' : 'Auto-refresh is off';
+  },
+
+  _setAutoRefreshInterval(mins) {
+    localStorage.setItem('msp_auto_refresh_mins', String(mins));
+    // If auto-refresh is currently active, restart with new interval
+    if (typeof Graph !== 'undefined' && Graph._refreshInterval) {
+      Graph.stopAutoRefresh();
+      Graph.startAutoRefresh(mins);
+      Toast.show(`Refresh interval updated to ${mins} minutes`, 'info');
+    }
+  },
+
+  async _manualRefresh() {
+    const tenants = AppState.get('tenants');
+    if (!tenants.length) {
+      Toast.show('No tenants connected', 'warning');
+      return;
+    }
+    Toast.show('Refreshing data from all tenants...', 'info');
+    Auth._isUserInitiated = true;
+    for (const t of tenants) {
+      try {
+        await Promise.allSettled([
+          Graph.loadDevices(t.id),
+          Graph.loadApps(t.id),
+          Graph.loadUsers(t.id),
+          Graph.loadConfigProfiles(t.id),
+          Graph.loadCAPolicies(t.id),
+        ]);
+      } catch {}
+    }
+    Auth._isUserInitiated = false;
+    Toast.show('All data refreshed', 'success');
+  },
+
   render() {
     const main = document.getElementById('mainContent');
     const tier = AppState.get('licenseTier');
@@ -109,6 +161,51 @@ const Settings = {
               <div class="fw-500 text-sm mb-1">Access Gate</div>
               <div class="text-xs text-muted mb-2">Password-protected entry point. Change the hash in index.html for production use.</div>
               <button class="btn btn-secondary btn-sm" onclick="SessionTimeout._lock()">Lock Now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Refresh Settings -->
+      <div class="card mt-6">
+        <div class="card-header">
+          <div class="card-header-title">Data Refresh</div>
+        </div>
+        <div class="card-body">
+          <div class="grid grid-2 gap-6">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <div class="fw-500 text-sm">Auto-Refresh</div>
+                  <div class="text-xs text-muted">Periodically refresh device and compliance data from Graph API</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="autoRefreshToggle" ${typeof Graph !== 'undefined' && Graph._refreshInterval ? 'checked' : ''}
+                    onchange="Settings._toggleAutoRefresh(this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="flex items-center gap-2 mt-3">
+                <label class="text-sm text-muted" style="white-space:nowrap;">Interval:</label>
+                <select class="form-input" id="autoRefreshInterval" style="max-width:180px;"
+                  onchange="Settings._setAutoRefreshInterval(parseInt(this.value))">
+                  ${[5, 10, 15, 30, 60].map(m => {
+                    const saved = parseInt(localStorage.getItem('msp_auto_refresh_mins') || '15');
+                    return `<option value="${m}" ${saved === m ? 'selected' : ''}>${m < 60 ? m + ' minutes' : '1 hour'}</option>`;
+                  }).join('')}
+                </select>
+              </div>
+              <div class="text-xs text-muted mt-2" id="autoRefreshStatus">
+                ${typeof Graph !== 'undefined' && Graph._refreshInterval ? 'Auto-refresh is active' : 'Auto-refresh is off'}
+              </div>
+            </div>
+            <div>
+              <div class="fw-500 text-sm mb-1">Manual Refresh</div>
+              <div class="text-xs text-muted mb-2">Reload all data from connected tenants immediately.</div>
+              <button class="btn btn-secondary btn-sm" onclick="Settings._manualRefresh()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Refresh All Data
+              </button>
             </div>
           </div>
         </div>

@@ -35,7 +35,11 @@ const Configurations = {
     { id: 'wifi', label: 'Wi-Fi Configuration', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>' },
     { id: 'vpn', label: 'VPN Configuration', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
     { id: 'email', label: 'Email Configuration', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' },
-    { id: 'custom', label: 'Custom (OMA-URI)', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>', windowsOnly: true }
+    { id: 'custom', label: 'Custom (OMA-URI)', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>', windowsOnly: true },
+    { id: 'endpointProtection', label: 'Endpoint Protection', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
+    { id: 'windowsHello', label: 'Windows Hello for Business', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', windowsOnly: true },
+    { id: 'kioskMode', label: 'Kiosk Mode', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>', windowsOnly: true },
+    { id: 'editionUpgrade', label: 'Edition Upgrade', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/></svg>', windowsOnly: true },
   ],
 
   /* ----------------------------------------------------------
@@ -65,6 +69,8 @@ const Configurations = {
     if (type.includes('Vpn') || type.includes('VPN')) return 'VPN';
     if (type.includes('Email') || type.includes('email')) return 'Email';
     if (type.includes('Update')) return 'Update Ring';
+    if (type.includes('IdentityProtection') || type.includes('Hello')) return 'Windows Hello';
+    if (type.includes('editionUpgrade') || type.includes('EditionUpgrade')) return 'Edition Upgrade';
     return 'Configuration';
   },
 
@@ -76,7 +82,9 @@ const Configurations = {
       Email: 'badge-default',
       Custom: 'badge-danger',
       'Endpoint Protection': 'badge-danger',
-      'Update Ring': 'badge-info'
+      'Update Ring': 'badge-info',
+      'Windows Hello': 'badge-success',
+      'Edition Upgrade': 'badge-warning'
     };
     return map[profileType] || 'badge-default';
   },
@@ -556,6 +564,10 @@ const Configurations = {
       case 'vpn':               return this._settingsVpn();
       case 'email':             return this._settingsEmail();
       case 'custom':            return this._settingsCustom();
+      case 'endpointProtection': return this._settingsEndpointProtection();
+      case 'windowsHello':       return this._settingsWindowsHello();
+      case 'kioskMode':          return this._settingsKiosk();
+      case 'editionUpgrade':     return this._settingsEditionUpgrade();
       default:                  return '<p class="text-muted">Select a profile type first.</p>';
     }
   },
@@ -743,6 +755,84 @@ const Configurations = {
     this._refreshWizardBody();
   },
 
+  _settingsEndpointProtection() {
+    const cfg = this.wizardState.settings;
+    const toggleRow = (key, label, desc) => {
+      const checked = cfg[key] !== false;
+      return `<label class="flex items-center gap-3" style="padding:var(--space-3) 0;border-bottom:1px solid var(--border)"><input type="checkbox" ${checked ? 'checked' : ''} onchange="Configurations.wizardToggle('${key}', this.checked)"><div><div class="text-sm fw-500">${label}</div><div class="text-xs text-muted">${desc}</div></div></label>`;
+    };
+    return `
+      <h3 class="text-sm fw-500 mb-3">Endpoint Protection</h3>
+      <p class="text-xs text-muted mb-3">Configure Windows Defender and endpoint protection.</p>
+      ${toggleRow('defenderRealTimeMonitoring', 'Real-Time Monitoring', 'Enable Defender real-time protection')}
+      ${toggleRow('defenderCloudProtection', 'Cloud-Delivered Protection', 'Use cloud for advanced threat detection')}
+      ${toggleRow('defenderNetworkProtection', 'Network Protection', 'Protect against web-based threats')}
+      ${toggleRow('defenderPUAProtection', 'PUA Protection', 'Block potentially unwanted apps')}
+      ${toggleRow('firewallEnabled', 'Windows Firewall', 'Enable Windows Defender Firewall')}
+      <div class="mb-3 mt-3"><label class="text-sm fw-500 mb-1" style="display:block">Cloud Block Level</label>
+        <select class="form-input" onchange="Configurations.wizardSet('defenderCloudBlockLevel', this.value)">
+          <option value="notConfigured" ${(cfg.defenderCloudBlockLevel || 'notConfigured') === 'notConfigured' ? 'selected' : ''}>Not Configured</option>
+          <option value="high" ${cfg.defenderCloudBlockLevel === 'high' ? 'selected' : ''}>High</option>
+          <option value="highPlus" ${cfg.defenderCloudBlockLevel === 'highPlus' ? 'selected' : ''}>High+</option>
+          <option value="zeroTolerance" ${cfg.defenderCloudBlockLevel === 'zeroTolerance' ? 'selected' : ''}>Zero Tolerance</option>
+        </select></div>`;
+  },
+
+  _settingsWindowsHello() {
+    const cfg = this.wizardState.settings;
+    const toggleRow = (key, label, desc) => {
+      const checked = cfg[key] !== false;
+      return `<label class="flex items-center gap-3" style="padding:var(--space-3) 0;border-bottom:1px solid var(--border)"><input type="checkbox" ${checked ? 'checked' : ''} onchange="Configurations.wizardToggle('${key}', this.checked)"><div><div class="text-sm fw-500">${label}</div><div class="text-xs text-muted">${desc}</div></div></label>`;
+    };
+    return `
+      <h3 class="text-sm fw-500 mb-3">Windows Hello for Business</h3>
+      <p class="text-xs text-muted mb-3">Configure passwordless authentication.</p>
+      ${toggleRow('pinRequired', 'Require PIN', 'Users must set up a PIN')}
+      ${toggleRow('fingerprintEnabled', 'Fingerprint', 'Allow fingerprint authentication')}
+      ${toggleRow('facialFeaturesEnabled', 'Facial Recognition', 'Allow face unlock')}
+      ${toggleRow('securityKeyEnabled', 'Security Key', 'Allow FIDO2 security key')}
+      <div class="grid grid-2 gap-3 mt-3">
+        <div><label class="text-sm fw-500 mb-1" style="display:block">Min PIN Length</label>
+          <input class="form-input" type="number" min="4" max="127" value="${cfg.pinMinLength || 6}" onchange="Configurations.wizardSet('pinMinLength', parseInt(this.value))"></div>
+        <div><label class="text-sm fw-500 mb-1" style="display:block">Max PIN Length</label>
+          <input class="form-input" type="number" min="4" max="127" value="${cfg.pinMaxLength || 127}" onchange="Configurations.wizardSet('pinMaxLength', parseInt(this.value))"></div>
+      </div>`;
+  },
+
+  _settingsKiosk() {
+    const cfg = this.wizardState.settings;
+    return `
+      <h3 class="text-sm fw-500 mb-3">Kiosk Mode</h3>
+      <p class="text-xs text-muted mb-3">Lock the device to run one or more apps.</p>
+      <div class="mb-3"><label class="text-sm fw-500 mb-1" style="display:block">Kiosk Type</label>
+        <select class="form-input" onchange="Configurations.wizardSet('kioskModeType', this.value)">
+          <option value="singleApp" ${(cfg.kioskModeType || 'singleApp') === 'singleApp' ? 'selected' : ''}>Single App</option>
+          <option value="multiApp" ${cfg.kioskModeType === 'multiApp' ? 'selected' : ''}>Multi-App</option>
+        </select></div>
+      <div class="mb-3"><label class="text-sm fw-500 mb-1" style="display:block">App AUMID or Path *</label>
+        <input class="form-input" type="text" value="${cfg.kioskAppId || ''}" onchange="Configurations.wizardSet('kioskAppId', this.value)" placeholder="Microsoft.WindowsCalculator_8wekyb3d8bbwe!App">
+        <div class="text-xs text-muted mt-1">UWP: Use AUMID. Win32: Use full exe path.</div></div>
+      <div class="mb-3"><label class="text-sm fw-500 mb-1" style="display:block">Auto-Logon</label>
+        <select class="form-input" onchange="Configurations.wizardSet('kioskAutoLogon', this.value)">
+          <option value="enabled" ${(cfg.kioskAutoLogon || 'enabled') === 'enabled' ? 'selected' : ''}>Enabled</option>
+          <option value="disabled" ${cfg.kioskAutoLogon === 'disabled' ? 'selected' : ''}>Disabled</option>
+        </select></div>`;
+  },
+
+  _settingsEditionUpgrade() {
+    const cfg = this.wizardState.settings;
+    return `
+      <h3 class="text-sm fw-500 mb-3">Windows Edition Upgrade</h3>
+      <p class="text-xs text-muted mb-3">Upgrade Windows edition using a product key.</p>
+      <div class="mb-3"><label class="text-sm fw-500 mb-1" style="display:block">Target Edition</label>
+        <select class="form-input" onchange="Configurations.wizardSet('targetEdition', this.value)">
+          <option value="windows10Enterprise" ${(cfg.targetEdition || 'windows10Enterprise') === 'windows10Enterprise' ? 'selected' : ''}>Windows 10/11 Enterprise</option>
+          <option value="windows10Education" ${cfg.targetEdition === 'windows10Education' ? 'selected' : ''}>Windows 10/11 Education</option>
+        </select></div>
+      <div class="mb-3"><label class="text-sm fw-500 mb-1" style="display:block">Product Key *</label>
+        <input class="form-input" type="text" value="${cfg.productKey || ''}" onchange="Configurations.wizardSet('productKey', this.value)" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"></div>`;
+  },
+
   /* ---------- Step 3: Name & Assign ---------- */
 
   _wizardStep3() {
@@ -823,6 +913,26 @@ const Configurations = {
       settingsSummary = oma.map(e =>
         `<div class="text-sm" style="padding:2px 0"><strong>${e.displayName || 'Unnamed'}:</strong> ${e.omaUri} = ${e.value} (${e.dataType})</div>`
       ).join('');
+    } else if (s.profileType === 'endpointProtection') {
+      settingsSummary = `
+        <div class="text-sm"><strong>Real-Time:</strong> ${s.settings.defenderRealTimeMonitoring !== false ? 'On' : 'Off'}</div>
+        <div class="text-sm"><strong>Cloud Protection:</strong> ${s.settings.defenderCloudProtection !== false ? 'On' : 'Off'}</div>
+        <div class="text-sm"><strong>Firewall:</strong> ${s.settings.firewallEnabled !== false ? 'On' : 'Off'}</div>
+        <div class="text-sm"><strong>Cloud Block Level:</strong> ${s.settings.defenderCloudBlockLevel || 'Not configured'}</div>`;
+    } else if (s.profileType === 'windowsHello') {
+      settingsSummary = `
+        <div class="text-sm"><strong>PIN:</strong> ${s.settings.pinRequired !== false ? 'Required' : 'Optional'} (${s.settings.pinMinLength || 6}-${s.settings.pinMaxLength || 127})</div>
+        <div class="text-sm"><strong>Fingerprint:</strong> ${s.settings.fingerprintEnabled !== false ? 'Enabled' : 'Disabled'}</div>
+        <div class="text-sm"><strong>Facial Recognition:</strong> ${s.settings.facialFeaturesEnabled !== false ? 'Enabled' : 'Disabled'}</div>`;
+    } else if (s.profileType === 'kioskMode') {
+      settingsSummary = `
+        <div class="text-sm"><strong>Type:</strong> ${s.settings.kioskModeType === 'multiApp' ? 'Multi-App' : 'Single App'}</div>
+        <div class="text-sm"><strong>App:</strong> ${s.settings.kioskAppId || '-'}</div>
+        <div class="text-sm"><strong>Auto-Logon:</strong> ${(s.settings.kioskAutoLogon || 'enabled') === 'enabled' ? 'Yes' : 'No'}</div>`;
+    } else if (s.profileType === 'editionUpgrade') {
+      settingsSummary = `
+        <div class="text-sm"><strong>Target:</strong> ${s.settings.targetEdition || 'Enterprise'}</div>
+        <div class="text-sm"><strong>Product Key:</strong> ${'*'.repeat(20)}</div>`;
     }
 
     return `
@@ -880,6 +990,8 @@ const Configurations = {
         const oma = s.settings.omaSettings || [];
         if (oma.some(e => !e.omaUri)) return Toast.show('All OMA-URI paths are required', 'warning');
       }
+      if (s.profileType === 'kioskMode' && !s.settings.kioskAppId) return Toast.show('App ID is required for kiosk mode', 'warning');
+      if (s.profileType === 'editionUpgrade' && !s.settings.productKey) return Toast.show('Product key is required', 'warning');
     }
 
     if (s.step === 3) {
@@ -1015,6 +1127,31 @@ const Configurations = {
         else entry.value = e.value || '';
         return entry;
       });
+    }
+
+    else if (s.profileType === 'endpointProtection') {
+      base['@odata.type'] = '#microsoft.graph.windows10EndpointProtectionConfiguration';
+      base.firewallEnabled = s.settings.firewallEnabled !== false;
+      base.defenderCloudBlockLevelType = s.settings.defenderCloudBlockLevel || 'notConfigured';
+    }
+
+    else if (s.profileType === 'windowsHello') {
+      base['@odata.type'] = '#microsoft.graph.windowsIdentityProtectionConfiguration';
+      base.useSecurityKeyForSignin = s.settings.securityKeyEnabled !== false;
+      base.pinMinimumLength = s.settings.pinMinLength || 6;
+      base.pinMaximumLength = s.settings.pinMaxLength || 127;
+    }
+
+    else if (s.profileType === 'kioskMode') {
+      base['@odata.type'] = '#microsoft.graph.windows10GeneralConfiguration';
+      base.kioskModeApp = s.settings.kioskAppId || '';
+    }
+
+    else if (s.profileType === 'editionUpgrade') {
+      base['@odata.type'] = '#microsoft.graph.editionUpgradeConfiguration';
+      base.targetEdition = s.settings.targetEdition || 'windows10Enterprise';
+      base.licenseType = 'productKey';
+      base.productKey = s.settings.productKey || '';
     }
 
     return base;

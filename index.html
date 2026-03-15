@@ -696,6 +696,7 @@
   <script src="js/tenantgroups.js"></script>
   <script src="js/dashboardwidgets.js"></script>
   <script src="js/settings.js"></script>
+  <script src="js/usercreation.js"></script>
   <script src="js/branding.js"></script>
   <script src="js/licensing.js"></script>
   <script src="js/sponsor.js"></script>
@@ -825,6 +826,11 @@
                   Graph.loadAllData(t.id).catch(err => {
                     console.warn(`Auto-reload failed for ${t.id}:`, err);
                   });
+                }
+                // Restore auto-refresh if it was enabled
+                if (localStorage.getItem('msp_auto_refresh_enabled') === 'true' && typeof Graph !== 'undefined' && Graph.startAutoRefresh) {
+                  const mins = parseInt(localStorage.getItem('msp_auto_refresh_mins') || '15');
+                  Graph.startAutoRefresh(mins);
                 }
               } else {
                 // Session expired — show reconnect banner (Auth already shows it)

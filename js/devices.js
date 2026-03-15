@@ -270,6 +270,7 @@ const Devices = {
     this.activeDetailTab = 'overview';
     this._detailTenantId = tenantId;
     this._detailDeviceId = deviceId;
+    this._detailDevice = device;
 
     const panel = document.getElementById('deviceDetailPanel');
     const body = document.getElementById('detailPanelBody');
@@ -299,6 +300,7 @@ const Devices = {
         <button class="tab" data-tab="compliance" onclick="Devices.switchDetailTab('compliance', this)">Compliance</button>
         <button class="tab" data-tab="apps" onclick="Devices.switchDetailTab('apps', this)">Apps</button>
         <button class="tab" data-tab="config" onclick="Devices.switchDetailTab('config', this)">Config</button>
+        <button class="tab" data-tab="groups" onclick="Devices.switchDetailTab('groups', this)">Groups</button>
         <button class="tab" data-tab="notes" onclick="Devices.switchDetailTab('notes', this)">Notes</button>
         <button class="tab" data-tab="actions" onclick="Devices.switchDetailTab('actions', this)">Actions</button>
       </div>
@@ -410,6 +412,19 @@ const Devices = {
         </div>
       </div>
 
+      <!-- Groups Tab -->
+      <div class="detail-tab-content" id="detailTab-groups" style="display:none;">
+        <div class="detail-section">
+          <div class="detail-section-title">Group Memberships</div>
+          <div id="detailGroupsContent">
+            <div class="text-center text-muted" style="padding:2rem;">
+              <div class="spinner" style="margin:0 auto 8px;"></div>
+              Loading group memberships...
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Notes Tab -->
       <div class="detail-tab-content" id="detailTab-notes" style="display:none;">
         <div class="detail-section">
@@ -449,6 +464,7 @@ const Devices = {
     if (tabName === 'compliance') this._loadComplianceTab();
     if (tabName === 'apps') this._loadAppsTab();
     if (tabName === 'config') this._loadConfigTab();
+    if (tabName === 'groups') this._loadGroupsTab();
   },
 
   async _loadComplianceTab() {
@@ -506,7 +522,7 @@ const Devices = {
     container.innerHTML = '<div class="text-muted" style="padding:1rem;">Loading installed apps...</div>';
     try {
       const result = await Graph.getDeviceInstalledApps(this._detailTenantId, this._detailDeviceId);
-      const apps = result?.value || result || [];
+      const apps = Array.isArray(result) ? result : (result?.value || []);
       if (!apps.length) {
         container.innerHTML = '<div class="text-muted" style="padding:1rem;">No installed apps found.</div>';
       } else {
@@ -550,6 +566,49 @@ const Devices = {
       Auth._isUserInitiated = false;
     }
     this._loadAppsTab();
+  },
+
+  async _loadGroupsTab() {
+    const container = document.getElementById('detailGroupsContent');
+    if (!container || container.dataset.loaded === 'true') return;
+    container.innerHTML = '<div class="text-muted" style="padding:1rem;">Loading group memberships...</div>';
+    const azureAdDeviceId = this._detailDevice?.azureADDeviceId;
+    if (!azureAdDeviceId) {
+      container.innerHTML = '<div class="text-muted" style="padding:1rem;">Azure AD Device ID not available for this device.</div>';
+      return;
+    }
+    try {
+      const groups = await Graph.getDeviceGroupMemberships(this._detailTenantId, azureAdDeviceId);
+      if (!groups || groups.length === 0) {
+        container.innerHTML = '<div class="text-muted" style="padding:1rem;">No group memberships found.</div>';
+      } else {
+        container.innerHTML = `
+          <div style="max-height:400px;overflow-y:auto;">
+            ${groups.map(g => {
+              const isDynamic = (g.groupTypes || []).includes('DynamicMembership');
+              const isUnified = (g.groupTypes || []).includes('Unified');
+              const badge = isDynamic ? '<span class="badge badge-warning">Dynamic</span>' :
+                           isUnified ? '<span class="badge badge-info">M365</span>' :
+                           '<span class="badge badge-default">Security</span>';
+              return `
+                <div class="detail-row">
+                  <span class="detail-label" style="flex:1;">${g.displayName || 'Unknown Group'}</span>
+                  <span class="detail-value">${badge}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div class="text-xs text-muted" style="margin-top:8px;">${groups.length} group(s)</div>
+        `;
+      }
+      container.dataset.loaded = 'true';
+    } catch (err) {
+      container.innerHTML = `
+        <div class="retry-state">
+          <p class="text-muted" style="color:var(--danger);">Failed to load groups: ${err.message}</p>
+          <button class="btn btn-primary btn-sm" onclick="Devices._loadGroupsTab()">Retry</button>
+        </div>`;
+    }
   },
 
   async _loadConfigTab() {
@@ -795,11 +854,12 @@ const Devices = {
           break;
         }
         case 'bitlocker': {
+          Toast.show('Retrieving BitLocker recovery keys...', 'info');
           const keys = await Graph.getBitLockerKeys(tenantId, deviceId);
           if (keys?.value?.length) {
-            alert(`BitLocker Recovery Keys:\n\n${keys.value.map(k => k.id + ': ' + k.key).join('\n')}`);
+            this._showBitLockerModal(name, keys.value);
           } else {
-            Toast.show('No BitLocker keys found for this device', 'info');
+            Toast.show('No BitLocker recovery keys found for this device', 'info');
           }
           break;
         }
@@ -845,6 +905,39 @@ const Devices = {
     } catch (error) {
       Toast.show(error.message, 'error', 'Action Failed');
     }
+  },
+
+  _showBitLockerModal(deviceName, keys) {
+    document.getElementById('bitlockerModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'bitlockerModal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:560px;width:95%;">
+        <div class="modal-header">
+          <h3 class="modal-title">BitLocker Recovery Keys — ${deviceName}</h3>
+          <button class="modal-close" onclick="document.getElementById('bitlockerModal').remove()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          ${keys.map(k => `
+            <div style="padding:12px;margin-bottom:8px;background:var(--gray-50);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div class="text-xs text-muted mb-1">Key ID: ${k.id}</div>
+              <div style="font-family:var(--font-mono);font-size:var(--text-base);font-weight:600;color:var(--ink);letter-spacing:0.05em;word-break:break-all;">${k.key}</div>
+              ${k.volumeType ? `<div class="text-xs text-muted mt-1">Volume: ${k.volumeType}</div>` : ''}
+              ${k.createdDateTime ? `<div class="text-xs text-muted">Created: ${new Date(k.createdDateTime).toLocaleString()}</div>` : ''}
+              <button class="btn btn-ghost btn-sm mt-2" onclick="navigator.clipboard.writeText('${(k.key || '').replace(/'/g, "\\'")}'); Toast.show('Key copied to clipboard', 'success');">
+                Copy Key
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
   },
 
   async bulkAction(type) {

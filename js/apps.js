@@ -56,6 +56,10 @@ const Apps = {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
             Reload
           </button>
+          <button class="btn btn-secondary" onclick="Apps.showAddAppWizard()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add App
+          </button>
           <button class="btn btn-primary" onclick="Apps.showDeployModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Deploy App
@@ -626,6 +630,209 @@ const Apps = {
       this._loadAssignments(tenantId, appId);
     } catch (err) {
       Toast.show('Failed: ' + err.message, 'error');
+    }
+  },
+
+  // --- Add App Wizard ---
+  _addAppState: { step: 1, appType: '', name: '', description: '', publisher: '', settings: {} },
+
+  showAddAppWizard() {
+    const tenantId = AppState.get('activeTenant');
+    if (!tenantId || tenantId === 'all') return Toast.show('Select a single tenant before adding an app', 'warning');
+    this._addAppState = { step: 1, appType: '', name: '', description: '', publisher: '', settings: {} };
+    this._renderAddAppWizard();
+  },
+
+  _renderAddAppWizard() {
+    document.getElementById('addAppWizard')?.remove();
+    const s = this._addAppState;
+    const steps = ['App Type', 'Details', 'Configuration', 'Review'];
+    const modal = document.createElement('div');
+    modal.id = 'addAppWizard';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:640px;width:95%;">
+        <div class="modal-header">
+          <h3 class="modal-title">Add Application</h3>
+          <button class="modal-close" onclick="document.getElementById('addAppWizard').remove()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);">
+          ${steps.map((t, i) => `
+            <div style="flex:1;text-align:center;padding:10px;font-size:12px;font-weight:500;
+              ${i + 1 === s.step ? 'color:var(--primary);border-bottom:2px solid var(--primary);' : 'color:var(--ink-muted);'}
+              ${i + 1 < s.step ? 'color:var(--success);' : ''}">
+              ${i + 1}. ${t}
+            </div>`).join('')}
+        </div>
+        <div class="modal-body" style="min-height:300px;max-height:60vh;overflow-y:auto;" id="addAppWizardBody">
+          ${this._addAppStep()}
+        </div>
+        <div class="modal-footer">
+          ${s.step > 1 ? '<button class="btn btn-ghost" onclick="Apps._addAppBack()">Back</button>' : '<span></span>'}
+          ${s.step < 4
+            ? '<button class="btn btn-primary" onclick="Apps._addAppNext()">Next</button>'
+            : '<button class="btn btn-primary" id="addAppCreateBtn" onclick="Apps._addAppCreate()">Create App</button>'}
+        </div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+  },
+
+  _addAppStep() {
+    switch (this._addAppState.step) {
+      case 1: return this._addAppStep1();
+      case 2: return this._addAppStep2();
+      case 3: return this._addAppStep3();
+      case 4: return this._addAppStep4();
+    }
+  },
+
+  _addAppStep1() {
+    const s = this._addAppState;
+    const types = [
+      { id: 'webApp', label: 'Web Link / Web App', desc: 'Link to a web application', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>' },
+      { id: 'win32', label: 'Windows App (Win32)', desc: 'Win32 / .intunewin app', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' },
+      { id: 'officeSuite', label: 'Microsoft 365 Apps', desc: 'Deploy M365 Apps for Enterprise', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h6"/></svg>' },
+      { id: 'iosStore', label: 'iOS Store App', desc: 'App from Apple App Store', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>' },
+      { id: 'androidStore', label: 'Android Store App', desc: 'App from Google Play', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>' },
+    ];
+    return `
+      <p class="text-sm text-muted mb-3">Select the type of application to add.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${types.map(t => `
+          <div class="card" style="cursor:pointer;padding:12px 16px;border:2px solid ${s.appType === t.id ? 'var(--primary)' : 'var(--border)'};transition:border-color .15s;"
+            onclick="Apps._addAppState.appType='${t.id}'; document.getElementById('addAppWizardBody').innerHTML=Apps._addAppStep1();">
+            <div class="flex items-center gap-3">
+              ${t.icon}
+              <div><div class="fw-500 text-sm">${t.label}</div><div class="text-xs text-muted">${t.desc}</div></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  },
+
+  _addAppStep2() {
+    const s = this._addAppState;
+    return `
+      <p class="text-sm text-muted mb-3">Enter the application details.</p>
+      <div class="mb-3"><label class="form-label">App Name *</label><input class="form-input" id="addAppName" type="text" value="${s.name}" placeholder="e.g. Microsoft Teams"></div>
+      <div class="mb-3"><label class="form-label">Description</label><textarea class="form-input" id="addAppDesc" rows="2" placeholder="Brief description...">${s.description}</textarea></div>
+      <div class="mb-3"><label class="form-label">Publisher</label><input class="form-input" id="addAppPublisher" type="text" value="${s.publisher}" placeholder="e.g. Microsoft"></div>
+      ${s.appType === 'webApp' ? '<div class="mb-3"><label class="form-label">App URL *</label><input class="form-input" id="addAppUrl" type="url" value="' + (s.settings.appUrl || '') + '" placeholder="https://..."></div>' : ''}
+      ${s.appType === 'iosStore' ? '<div class="mb-3"><label class="form-label">App Store URL *</label><input class="form-input" id="addAppStoreUrl" type="url" value="' + (s.settings.appStoreUrl || '') + '" placeholder="https://apps.apple.com/..."></div><div class="mb-3"><label class="form-label">Bundle ID</label><input class="form-input" id="addAppBundleId" type="text" value="' + (s.settings.bundleId || '') + '" placeholder="com.example.app"></div>' : ''}
+      ${s.appType === 'androidStore' ? '<div class="mb-3"><label class="form-label">Play Store URL *</label><input class="form-input" id="addAppPlayUrl" type="url" value="' + (s.settings.playStoreUrl || '') + '" placeholder="https://play.google.com/..."></div><div class="mb-3"><label class="form-label">Package ID</label><input class="form-input" id="addAppPkgId" type="text" value="' + (s.settings.packageId || '') + '" placeholder="com.example.app"></div>' : ''}`;
+  },
+
+  _addAppStep3() {
+    const s = this._addAppState;
+    const cfg = s.settings;
+    if (s.appType === 'webApp') {
+      return `<p class="text-sm fw-500 mb-3">Web App Settings</p>
+        <label class="flex items-center gap-2"><input type="checkbox" id="addAppManagedBrowser" ${cfg.useManagedBrowser ? 'checked' : ''}><span class="text-sm">Open in Managed Browser (Edge)</span></label>`;
+    }
+    if (s.appType === 'win32') {
+      return `<p class="text-sm fw-500 mb-3">Win32 App Configuration</p>
+        <p class="text-xs text-muted mb-3">Note: Upload the .intunewin package via the Intune portal after creating the app entry.</p>
+        <div class="mb-3"><label class="form-label">Install Command</label><input class="form-input" id="addAppInstallCmd" type="text" value="${cfg.installCommandLine || ''}" placeholder="msiexec /i app.msi /qn"></div>
+        <div class="mb-3"><label class="form-label">Uninstall Command</label><input class="form-input" id="addAppUninstallCmd" type="text" value="${cfg.uninstallCommandLine || ''}" placeholder="msiexec /x {Code} /qn"></div>
+        <div class="mb-3"><label class="form-label">Install Behavior</label><select class="form-input" id="addAppInstallBehavior"><option value="system" ${(cfg.installExperience || 'system') === 'system' ? 'selected' : ''}>System</option><option value="user" ${cfg.installExperience === 'user' ? 'selected' : ''}>User</option></select></div>`;
+    }
+    if (s.appType === 'officeSuite') {
+      return `<p class="text-sm fw-500 mb-3">Microsoft 365 Apps</p>
+        <div class="mb-3"><label class="form-label">Update Channel</label><select class="form-input" id="addAppChannel"><option value="current" ${(cfg.updateChannel || 'current') === 'current' ? 'selected' : ''}>Current</option><option value="monthlyEnterprise" ${cfg.updateChannel === 'monthlyEnterprise' ? 'selected' : ''}>Monthly Enterprise</option><option value="semiAnnual" ${cfg.updateChannel === 'semiAnnual' ? 'selected' : ''}>Semi-Annual</option></select></div>
+        <p class="text-sm fw-500 mb-2">Apps to Include</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">${['Word','Excel','PowerPoint','Outlook','Teams','OneNote','Access','Publisher'].map(a => `<label class="flex items-center gap-2" style="padding:4px 0;"><input type="checkbox" class="addAppOfficeApp" value="${a}" ${!cfg['exclude' + a] ? 'checked' : ''}><span class="text-sm">${a}</span></label>`).join('')}</div>`;
+    }
+    if (s.appType === 'iosStore' || s.appType === 'androidStore') {
+      return `<p class="text-sm fw-500 mb-3">Store App Settings</p>
+        <div class="mb-3"><label class="form-label">Minimum OS Version</label><input class="form-input" id="addAppMinOs" type="text" value="${cfg.minOsVersion || ''}" placeholder="${s.appType === 'iosStore' ? '15.0' : '10.0'}"></div>
+        <label class="flex items-center gap-2"><input type="checkbox" id="addAppFeatured" ${cfg.isFeatured ? 'checked' : ''}><span class="text-sm">Show as featured in Company Portal</span></label>`;
+    }
+    return '<p class="text-muted">No additional configuration needed.</p>';
+  },
+
+  _addAppStep4() {
+    const s = this._addAppState;
+    const labels = { webApp: 'Web App', win32: 'Win32', officeSuite: 'M365 Apps', iosStore: 'iOS Store', androidStore: 'Android Store' };
+    return `
+      <h3 class="text-sm fw-500 mb-3">Review Application</h3>
+      <div class="card" style="padding:16px;border:1px solid var(--border);">
+        <div class="mb-3"><div class="text-xs text-muted">Name</div><div class="fw-500">${s.name || '<span class="text-danger">Not set</span>'}</div></div>
+        <div class="mb-3"><div class="text-xs text-muted">Type</div><span class="badge badge-default">${labels[s.appType] || s.appType}</span></div>
+        ${s.publisher ? `<div class="mb-3"><div class="text-xs text-muted">Publisher</div><div class="text-sm">${s.publisher}</div></div>` : ''}
+        ${s.settings.appUrl ? `<div class="mb-3"><div class="text-xs text-muted">URL</div><div class="text-sm text-mono">${s.settings.appUrl}</div></div>` : ''}
+        ${s.settings.installCommandLine ? `<div class="mb-3"><div class="text-xs text-muted">Install</div><div class="text-sm text-mono">${s.settings.installCommandLine}</div></div>` : ''}
+      </div>
+      <p class="text-xs text-muted mt-3">The app entry will be created in Intune for the selected tenant.</p>`;
+  },
+
+  _captureAddAppStep(step) {
+    const s = this._addAppState;
+    if (step === 2) {
+      s.name = document.getElementById('addAppName')?.value || '';
+      s.description = document.getElementById('addAppDesc')?.value || '';
+      s.publisher = document.getElementById('addAppPublisher')?.value || '';
+      if (s.appType === 'webApp') s.settings.appUrl = document.getElementById('addAppUrl')?.value || '';
+      if (s.appType === 'iosStore') { s.settings.appStoreUrl = document.getElementById('addAppStoreUrl')?.value || ''; s.settings.bundleId = document.getElementById('addAppBundleId')?.value || ''; }
+      if (s.appType === 'androidStore') { s.settings.playStoreUrl = document.getElementById('addAppPlayUrl')?.value || ''; s.settings.packageId = document.getElementById('addAppPkgId')?.value || ''; }
+    }
+    if (step === 3) {
+      if (s.appType === 'webApp') s.settings.useManagedBrowser = document.getElementById('addAppManagedBrowser')?.checked || false;
+      if (s.appType === 'win32') { s.settings.installCommandLine = document.getElementById('addAppInstallCmd')?.value || ''; s.settings.uninstallCommandLine = document.getElementById('addAppUninstallCmd')?.value || ''; s.settings.installExperience = document.getElementById('addAppInstallBehavior')?.value || 'system'; }
+      if (s.appType === 'officeSuite') { s.settings.updateChannel = document.getElementById('addAppChannel')?.value || 'current'; document.querySelectorAll('.addAppOfficeApp').forEach(cb => { s.settings['exclude' + cb.value] = !cb.checked; }); }
+      if (s.appType === 'iosStore' || s.appType === 'androidStore') { s.settings.minOsVersion = document.getElementById('addAppMinOs')?.value || ''; s.settings.isFeatured = document.getElementById('addAppFeatured')?.checked || false; }
+    }
+  },
+
+  _addAppBack() {
+    this._captureAddAppStep(this._addAppState.step);
+    this._addAppState.step--;
+    this._renderAddAppWizard();
+  },
+
+  _addAppNext() {
+    const s = this._addAppState;
+    this._captureAddAppStep(s.step);
+    if (s.step === 1 && !s.appType) return Toast.show('Select an app type', 'warning');
+    if (s.step === 2) {
+      if (!s.name.trim()) return Toast.show('App name is required', 'warning');
+      if (s.appType === 'webApp' && !s.settings.appUrl) return Toast.show('App URL is required', 'warning');
+      if (s.appType === 'iosStore' && !s.settings.appStoreUrl) return Toast.show('App Store URL is required', 'warning');
+      if (s.appType === 'androidStore' && !s.settings.playStoreUrl) return Toast.show('Play Store URL is required', 'warning');
+    }
+    s.step++;
+    this._renderAddAppWizard();
+  },
+
+  _buildAppPayload() {
+    const s = this._addAppState;
+    const base = { displayName: s.name.trim(), description: s.description.trim() || null, publisher: s.publisher.trim() || null, isFeatured: s.settings.isFeatured || false };
+    switch (s.appType) {
+      case 'webApp': return { ...base, '@odata.type': '#microsoft.graph.webApp', appUrl: s.settings.appUrl, useManagedBrowser: s.settings.useManagedBrowser || false };
+      case 'officeSuite': return { ...base, '@odata.type': '#microsoft.graph.officeSuiteApp', officePlatformArchitecture: 'x64', updateChannel: s.settings.updateChannel || 'current', useSharedComputerActivation: false, excludedApps: { access: s.settings.excludeAccess || false, excel: s.settings.excludeExcel || false, oneNote: s.settings.excludeOneNote || false, outlook: s.settings.excludeOutlook || false, powerPoint: s.settings.excludePowerPoint || false, publisher: s.settings.excludePublisher || false, teams: s.settings.excludeTeams || false, word: s.settings.excludeWord || false } };
+      case 'iosStore': return { ...base, '@odata.type': '#microsoft.graph.iosStoreApp', appStoreUrl: s.settings.appStoreUrl, bundleId: s.settings.bundleId || '', applicableDeviceType: { iPad: true, iPhoneAndIPod: true }, minimumSupportedOperatingSystem: { v15_0: true } };
+      case 'androidStore': return { ...base, '@odata.type': '#microsoft.graph.androidStoreApp', appStoreUrl: s.settings.playStoreUrl, packageId: s.settings.packageId || '', minimumSupportedOperatingSystem: { v10_0: true } };
+      case 'win32': return { ...base, '@odata.type': '#microsoft.graph.win32LobApp', installCommandLine: s.settings.installCommandLine || '', uninstallCommandLine: s.settings.uninstallCommandLine || '', installExperience: { runAsAccount: s.settings.installExperience || 'system', deviceRestartBehavior: 'basedOnReturnCode' }, setupFilePath: 'setup.exe' };
+      default: return base;
+    }
+  },
+
+  async _addAppCreate() {
+    const btn = document.getElementById('addAppCreateBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+    const tenantId = AppState.get('activeTenant');
+    try {
+      await Graph.call(tenantId, '/deviceAppManagement/mobileApps', { method: 'POST', body: this._buildAppPayload() });
+      Toast.show('Application created successfully', 'success');
+      document.getElementById('addAppWizard')?.remove();
+      await Graph.loadApps(tenantId).catch(() => {});
+      this.render();
+    } catch (err) {
+      Toast.show('Failed to create app: ' + err.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Create App'; }
     }
   },
 
