@@ -10,6 +10,101 @@ const Graph = {
   _refreshInterval: null,
   _refreshMinutes: 0,
 
+  // Rate limit tracking — updated from Graph API response headers
+  rateLimitStatus: {
+    remaining: null,
+    resetTime: null,
+    throttled: false
+  },
+
+  // Returns the current rate limit / health status
+  getHealthStatus() {
+    return {
+      remaining: this.rateLimitStatus.remaining,
+      resetTime: this.rateLimitStatus.resetTime,
+      throttled: this.rateLimitStatus.throttled,
+      healthy: !this.rateLimitStatus.throttled && (this.rateLimitStatus.remaining === null || this.rateLimitStatus.remaining > 10)
+    };
+  },
+
+  // Private helper: updates rateLimitStatus from response headers
+  _updateRateLimitStatus(response) {
+    const remaining = response.headers.get('RateLimit-Remaining') ?? response.headers.get('x-ms-ratelimit-remaining');
+    const reset = response.headers.get('RateLimit-Reset') ?? response.headers.get('x-ms-ratelimit-reset');
+    if (remaining !== null) {
+      this.rateLimitStatus.remaining = parseInt(remaining, 10);
+    }
+    if (reset !== null) {
+      this.rateLimitStatus.resetTime = new Date(Date.now() + parseInt(reset, 10) * 1000).toISOString();
+    }
+    this.rateLimitStatus.throttled = response.status === 429;
+  },
+
+  // Private helper: fetch with retry, exponential backoff, and 401 token refresh
+  async _fetchWithRetry(url, fetchOptions, tenantId, maxRetries = 3) {
+    let lastError = null;
+    let has401Retried = false;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, fetchOptions);
+
+        // Update rate limit tracking from headers
+        this._updateRateLimitStatus(response);
+
+        // HTTP 429 — Too Many Requests
+        if (response.status === 429) {
+          if (attempt < maxRetries) {
+            const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10);
+            console.warn(`[Graph] 429 throttled on ${url} — retrying in ${retryAfter}s (attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, retryAfter * 1000));
+            continue;
+          }
+        }
+
+        // HTTP 5xx — Server errors with exponential backoff
+        if (response.status >= 500 && response.status <= 504) {
+          if (attempt < maxRetries) {
+            const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+            console.warn(`[Graph] ${response.status} server error on ${url} — retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+        }
+
+        // HTTP 401 — Attempt token refresh once
+        if (response.status === 401 && !has401Retried) {
+          has401Retried = true;
+          console.warn(`[Graph] 401 on ${url} — attempting token refresh`);
+          try {
+            const newToken = await Auth.getToken(tenantId);
+            if (newToken) {
+              fetchOptions.headers['Authorization'] = `Bearer ${newToken}`;
+              continue;
+            }
+          } catch (refreshErr) {
+            console.warn('[Graph] Token refresh failed:', refreshErr.message);
+          }
+        }
+
+        // Return response for all other cases (success or non-retryable errors)
+        return response;
+      } catch (networkErr) {
+        // Network-level errors (DNS, timeout, etc.) — retry with backoff
+        lastError = networkErr;
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.warn(`[Graph] Network error on ${url}: ${networkErr.message} — retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
+    }
+
+    // All retries exhausted
+    throw lastError || new Error(`[Graph] Request to ${url} failed after ${maxRetries + 1} attempts`);
+  },
+
   // Generic Graph API call with retry logic
   async call(tenantId, endpoint, options = {}) {
     const maxRetries = options.retries ?? 2;
@@ -45,7 +140,7 @@ const Graph = {
     }
 
     const url = (options.beta ? this.betaUrl : this.baseUrl) + endpoint;
-    const response = await fetch(url, {
+    const fetchOptions = {
       method: options.method || 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -53,7 +148,10 @@ const Graph = {
         ...options.headers
       },
       body: options.body ? JSON.stringify(options.body) : undefined
-    });
+    };
+
+    // Use _fetchWithRetry for automatic retry on 429, 5xx, 401, and network errors
+    const response = await this._fetchWithRetry(url, fetchOptions, tenantId);
 
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({}));

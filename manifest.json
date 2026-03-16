@@ -1,0 +1,32 @@
+{
+  "name": "MSP Device Manager",
+  "short_name": "MSP DM",
+  "description": "Multi-tenant M365 device management for MSPs",
+  "start_url": "/MSP-Device-Manager/",
+  "scope": "/MSP-Device-Manager/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#2563eb",
+  "background_color": "#f8fafc",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect x='16' y='16' width='160' height='160' rx='28' fill='%232563eb'/%3E%3Crect x='48' y='56' width='96' height='8' rx='4' fill='white'/%3E%3Crect x='48' y='76' width='80' height='8' rx='4' fill='white' opacity='.85'/%3E%3Crect x='48' y='96' width='96' height='8' rx='4' fill='white'/%3E%3Crect x='48' y='116' width='64' height='8' rx='4' fill='white' opacity='.85'/%3E%3Crect x='48' y='136' width='96' height='8' rx='4' fill='white' opacity='.7'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect x='42' y='42' width='428' height='428' rx='75' fill='%232563eb'/%3E%3Crect x='128' y='150' width='256' height='22' rx='11' fill='white'/%3E%3Crect x='128' y='203' width='213' height='22' rx='11' fill='white' opacity='.85'/%3E%3Crect x='128' y='256' width='256' height='22' rx='11' fill='white'/%3E%3Crect x='128' y='309' width='171' height='22' rx='11' fill='white' opacity='.85'/%3E%3Crect x='128' y='362' width='256' height='22' rx='11' fill='white' opacity='.7'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%232563eb'/%3E%3Crect x='128' y='150' width='256' height='22' rx='11' fill='white'/%3E%3Crect x='128' y='203' width='213' height='22' rx='11' fill='white' opacity='.85'/%3E%3Crect x='128' y='256' width='256' height='22' rx='11' fill='white'/%3E%3Crect x='128' y='309' width='171' height='22' rx='11' fill='white' opacity='.85'/%3E%3Crect x='128' y='362' width='256' height='22' rx='11' fill='white' opacity='.7'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

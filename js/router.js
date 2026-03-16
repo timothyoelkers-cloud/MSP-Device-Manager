@@ -133,6 +133,16 @@ const Router = {
     if (typeof QuickActions !== 'undefined') QuickActions.init();
     // Initialize trend chart auto-snapshots
     if (typeof TrendCharts !== 'undefined') TrendCharts.init();
+    // Initialize error handler
+    if (typeof ErrorHandler !== 'undefined') ErrorHandler.init();
+    // Initialize help tooltips
+    if (typeof HelpTooltips !== 'undefined') HelpTooltips.init();
+    // Initialize PWA
+    if (typeof PWA !== 'undefined') PWA.init();
+    // Show What's New for returning users
+    if (typeof WhatsNew !== 'undefined' && WhatsNew.shouldShow()) {
+      setTimeout(() => WhatsNew.show(), 1000);
+    }
     // Show setup wizard for first-time users
     if (typeof SetupWizard !== 'undefined' && SetupWizard.shouldShow()) {
       setTimeout(() => SetupWizard.show(), 500);
