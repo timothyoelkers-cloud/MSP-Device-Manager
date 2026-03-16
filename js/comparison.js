@@ -51,6 +51,7 @@ const Comparison = {
   _renderComparison(tenants) {
     const selected = tenants.filter(t => this.selectedTenants.includes(t.id));
     return `
+      ${this._renderSecurityPosture(selected)}
       ${this._renderDeviceComparison(selected)}
       ${this._renderComplianceComparison(selected)}
       ${this._renderPolicyComparison(selected)}
@@ -192,9 +193,102 @@ const Comparison = {
   },
 
   _compRow(label, tenants, valueFn) {
+    const values = tenants.map(t => valueFn(t));
+    // Highlight best/worst if numeric
+    const nums = values.map(v => parseFloat(v));
+    const allNumeric = nums.every(n => !isNaN(n));
+    const max = allNumeric ? Math.max(...nums) : null;
+    const min = allNumeric ? Math.min(...nums) : null;
+
     return `<tr>
       <td class="fw-500">${label}</td>
-      ${tenants.map(t => `<td>${valueFn(t)}</td>`).join('')}
+      ${values.map((v, i) => {
+        let style = '';
+        if (allNumeric && nums.length > 1) {
+          if (nums[i] === max && max !== min) style = 'color:var(--success);font-weight:600;';
+          if (nums[i] === min && max !== min && label.includes('Rate')) style = 'color:var(--danger);font-weight:600;';
+        }
+        return `<td style="${style}">${v}</td>`;
+      }).join('')}
     </tr>`;
+  },
+
+  // --- Security Posture Score ---
+  _renderSecurityPosture(tenants) {
+    return `
+      <div class="card mb-4">
+        <div class="card-header"><div class="card-header-title">Security Posture Score</div></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(${Math.min(tenants.length, 4)}, 1fr);gap:16px;">
+            ${tenants.map(t => {
+              const score = this._calcSecurityScore(t);
+              const color = score >= 80 ? 'var(--success)' : score >= 50 ? 'var(--warning)' : 'var(--danger)';
+              return `
+                <div style="text-align:center;padding:20px;border:1px solid var(--border);border-radius:10px;">
+                  <div style="position:relative;width:80px;height:80px;margin:0 auto 12px;">
+                    <svg viewBox="0 0 36 36" style="transform:rotate(-90deg);">
+                      <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none" stroke="var(--gray-100)" stroke-width="3"/>
+                      <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none" stroke="${color}" stroke-width="3"
+                            stroke-dasharray="${score}, 100"/>
+                    </svg>
+                    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:${color};">${score}</div>
+                  </div>
+                  <div class="fw-500">${t.displayName}</div>
+                  <div class="text-xs text-muted">${score >= 80 ? 'Strong' : score >= 50 ? 'Moderate' : 'Needs Attention'}</div>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  _calcSecurityScore(tenant) {
+    let score = 0, total = 0;
+    const devices = AppState.get('devices')[tenant.id] || [];
+    const users = AppState.get('users')[tenant.id] || [];
+    const caPolicies = AppState.get('caPolicies')[tenant.id] || [];
+    const compPolicies = AppState.get('compliancePolicies')[tenant.id] || [];
+
+    // Compliance rate (30 pts)
+    total += 30;
+    if (devices.length > 0) {
+      const compliant = devices.filter(d => d.complianceState === 'compliant').length;
+      score += Math.round((compliant / devices.length) * 30);
+    }
+
+    // Encryption rate (20 pts)
+    total += 20;
+    if (devices.length > 0) {
+      const encrypted = devices.filter(d => d.isEncrypted).length;
+      score += Math.round((encrypted / devices.length) * 20);
+    }
+
+    // Has CA policies (15 pts)
+    total += 15;
+    if (caPolicies.length >= 3) score += 15;
+    else if (caPolicies.length >= 1) score += 8;
+
+    // Has compliance policies (15 pts)
+    total += 15;
+    if (compPolicies.length >= 3) score += 15;
+    else if (compPolicies.length >= 1) score += 8;
+
+    // Licensed users ratio (10 pts)
+    total += 10;
+    if (users.length > 0) {
+      const licensed = users.filter(u => u.assignedLicenses?.length > 0).length;
+      score += Math.round((licensed / users.length) * 10);
+    }
+
+    // Active users ratio (10 pts)
+    total += 10;
+    if (users.length > 0) {
+      const active = users.filter(u => u.accountEnabled).length;
+      score += Math.round((active / users.length) * 10);
+    }
+
+    return total > 0 ? Math.round((score / total) * 100) : 0;
   }
 };

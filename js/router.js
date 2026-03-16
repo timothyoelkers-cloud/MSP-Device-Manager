@@ -46,6 +46,11 @@ const Router = {
     'webhooks': ['Settings', 'Webhooks'],
     'rbac': ['Settings', 'Access Control'],
     'branding': ['Settings', 'Custom Branding'],
+    'syncdashboard': ['Device Management', 'Sync Dashboard'],
+    'licenseoptimizer': ['Multi-Tenant', 'License Optimizer'],
+    'incidentresponse': ['Security & Compliance', 'Incident Response'],
+    'notificationrules': ['Multi-Tenant', 'Notification Rules'],
+    'savedviews': ['Tools', 'Saved Views'],
   },
 
   routes: {
@@ -90,6 +95,11 @@ const Router = {
     'policydrift':     () => PolicyDrift.render(),
     'tenantgroups':    () => TenantGroups.render(),
     'settings':        () => Settings.render(),
+    'syncdashboard':   () => SyncDashboard.render(),
+    'licenseoptimizer': () => LicenseOptimizer.render(),
+    'incidentresponse': () => IncidentResponse.render(),
+    'notificationrules': () => NotificationRules.render(),
+    'savedviews':      () => SavedViews.render(),
   },
 
   init() {

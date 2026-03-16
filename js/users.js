@@ -43,6 +43,10 @@ const Users = {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export CSV
           </button>
+          <button class="btn btn-secondary btn-sm" onclick="Users.showBulkOps()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            Bulk Actions
+          </button>
           <button class="btn btn-primary btn-sm" onclick="UserCreation.showWizard()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
             Create User
@@ -306,5 +310,138 @@ const Users = {
     if (hrs < 24) return `${hrs}h ago`;
     const days = Math.floor(hrs / 24);
     return `${days}d ago`;
+  },
+
+  // --- Bulk Operations ---
+  showBulkOps() {
+    const tenant = AppState.get('activeTenant');
+    if (tenant === 'all') { Toast.show('Select a specific tenant for bulk operations', 'warning'); return; }
+
+    document.getElementById('bulkUserModal')?.remove();
+    const users = AppState.getForContext('users');
+    const overlay = document.createElement('div');
+    overlay.id = 'bulkUserModal';
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.4);';
+
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border-radius:12px;width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;font-size:16px;">Bulk User Operations</h3>
+          <button onclick="document.getElementById('bulkUserModal').remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--ink-tertiary);">&times;</button>
+        </div>
+        <div style="padding:24px;">
+          <!-- Target Selection -->
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Target Users</label>
+            <select class="form-input" id="bulkTarget" onchange="Users._updateBulkCount()">
+              <option value="all">All Users (${users.length})</option>
+              <option value="enabled">Enabled Users (${users.filter(u => u.accountEnabled).length})</option>
+              <option value="disabled">Disabled Users (${users.filter(u => !u.accountEnabled).length})</option>
+              <option value="licensed">Licensed Users (${users.filter(u => u.assignedLicenses?.length > 0).length})</option>
+              <option value="unlicensed">Unlicensed Users (${users.filter(u => !u.assignedLicenses?.length).length})</option>
+              <option value="inactive">Inactive 30+ days (${users.filter(u => !u.signInActivity?.lastSignInDateTime || Date.now() - new Date(u.signInActivity.lastSignInDateTime).getTime() > 2592000000).length})</option>
+            </select>
+            <div class="text-xs text-muted" style="margin-top:4px;" id="bulkCountLabel">${users.length} users selected</div>
+          </div>
+
+          <!-- Action Selection -->
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Action</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              ${[
+                { id: 'resetPwd', label: 'Reset Passwords', desc: 'Force password change', color: 'var(--warning)' },
+                { id: 'disable', label: 'Disable Accounts', desc: 'Block sign-in', color: 'var(--danger)' },
+                { id: 'enable', label: 'Enable Accounts', desc: 'Allow sign-in', color: 'var(--success)' },
+                { id: 'revoke', label: 'Revoke Sessions', desc: 'Force re-auth', color: 'var(--primary)' }
+              ].map(a => `
+                <div id="bulkAction_${a.id}" onclick="Users._selectBulkAction('${a.id}')"
+                     style="padding:12px;border:2px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.15s;">
+                  <div class="fw-500 text-sm">${a.label}</div>
+                  <div class="text-xs text-muted">${a.desc}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('bulkUserModal').remove()">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="bulkExecuteBtn" onclick="Users._executeBulkOp()" disabled>Execute</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    this._bulkAction = null;
+  },
+
+  _bulkAction: null,
+
+  _selectBulkAction(action) {
+    this._bulkAction = action;
+    ['resetPwd', 'disable', 'enable', 'revoke'].forEach(a => {
+      const el = document.getElementById(`bulkAction_${a}`);
+      if (el) el.style.borderColor = a === action ? 'var(--primary)' : 'var(--border)';
+      if (el) el.style.background = a === action ? 'var(--primary-pale)' : '';
+    });
+    const btn = document.getElementById('bulkExecuteBtn');
+    if (btn) btn.disabled = false;
+  },
+
+  _updateBulkCount() {
+    const target = document.getElementById('bulkTarget')?.value;
+    const users = this._getBulkTargetUsers(target);
+    const label = document.getElementById('bulkCountLabel');
+    if (label) label.textContent = `${users.length} users selected`;
+  },
+
+  _getBulkTargetUsers(target) {
+    const users = AppState.getForContext('users');
+    switch (target) {
+      case 'enabled': return users.filter(u => u.accountEnabled);
+      case 'disabled': return users.filter(u => !u.accountEnabled);
+      case 'licensed': return users.filter(u => u.assignedLicenses?.length > 0);
+      case 'unlicensed': return users.filter(u => !u.assignedLicenses?.length);
+      case 'inactive': return users.filter(u => !u.signInActivity?.lastSignInDateTime || Date.now() - new Date(u.signInActivity.lastSignInDateTime).getTime() > 2592000000);
+      default: return users;
+    }
+  },
+
+  async _executeBulkOp() {
+    const target = document.getElementById('bulkTarget')?.value;
+    const users = this._getBulkTargetUsers(target);
+    const action = this._bulkAction;
+    if (!action || !users.length) return;
+
+    const labels = { resetPwd: 'reset passwords for', disable: 'disable', enable: 'enable', revoke: 'revoke sessions for' };
+    if (!await Confirm.show({ title: 'Bulk Operation', message: `${labels[action]} <strong>${users.length}</strong> users? This cannot be undone.`, confirmText: 'Execute', type: action === 'disable' ? 'danger' : 'warning' })) return;
+
+    document.getElementById('bulkUserModal')?.remove();
+    Toast.show(`Processing ${users.length} users...`, 'info');
+
+    let success = 0, fail = 0;
+    for (const u of users) {
+      try {
+        switch (action) {
+          case 'resetPwd':
+            const pwd = 'Temp' + Math.random().toString(36).slice(2, 10) + '!';
+            await Graph.call(u._tenantId, `/users/${u.id}`, { method: 'PATCH', body: { passwordProfile: { password: pwd, forceChangePasswordNextSignIn: true } } });
+            break;
+          case 'disable':
+            await Graph.call(u._tenantId, `/users/${u.id}`, { method: 'PATCH', body: { accountEnabled: false } });
+            break;
+          case 'enable':
+            await Graph.call(u._tenantId, `/users/${u.id}`, { method: 'PATCH', body: { accountEnabled: true } });
+            break;
+          case 'revoke':
+            await Graph.call(u._tenantId, `/users/${u.id}/revokeSignInSessions`, { method: 'POST' });
+            break;
+        }
+        success++;
+      } catch { fail++; }
+    }
+
+    Toast.show(`Bulk ${labels[action]}: ${success} succeeded, ${fail} failed`, success > 0 ? 'success' : 'error');
+    AuditLog.log('Bulk User Operation', `${labels[action]} ${success}/${users.length} users`, AppState.getTenantName(AppState.get('activeTenant')));
+    if (action === 'disable' || action === 'enable') this.reload();
   }
 };
