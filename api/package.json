@@ -1,0 +1,25 @@
+{
+  "name": "msp-device-manager-api",
+  "version": "1.0.0",
+  "description": "Backend API for MSP Device Manager",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "func start",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "@azure/identity": "^4.0.0",
+    "@azure/keyvault-secrets": "^4.8.0",
+    "@azure/functions": "^4.5.0",
+    "@azure/msal-node": "^2.6.0",
+    "jsonwebtoken": "^9.0.0",
+    "jwks-rsa": "^3.1.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
