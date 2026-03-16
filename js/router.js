@@ -51,6 +51,13 @@ const Router = {
     'incidentresponse': ['Security & Compliance', 'Incident Response'],
     'notificationrules': ['Multi-Tenant', 'Notification Rules'],
     'savedviews': ['Tools', 'Saved Views'],
+    'healthsummary': ['Multi-Tenant', 'Health Summary'],
+    'slatracking': ['Multi-Tenant', 'SLA Tracking'],
+    'changelog': ['Multi-Tenant', 'Change Log'],
+    'technotes': ['Tools', 'Technician Notes'],
+    'executivedash': ['Multi-Tenant', 'Executive Dashboard'],
+    'trendcharts': ['Multi-Tenant', 'Trend Charts'],
+    'psalinks': ['Settings', 'PSA Integrations'],
   },
 
   routes: {
@@ -100,6 +107,13 @@ const Router = {
     'incidentresponse': () => IncidentResponse.render(),
     'notificationrules': () => NotificationRules.render(),
     'savedviews':      () => SavedViews.render(),
+    'healthsummary':   () => HealthSummary.render(),
+    'slatracking':     () => SLATracking.render(),
+    'changelog':       () => ChangeLog.render(),
+    'technotes':       () => TechNotes.render(),
+    'executivedash':   () => ExecutiveDash.render(),
+    'trendcharts':     () => TrendCharts.render(),
+    'psalinks':        () => PSALinks.render(),
   },
 
   init() {
@@ -110,6 +124,18 @@ const Router = {
     // Show onboarding tour for first-time users
     if (typeof Onboarding !== 'undefined' && Onboarding.shouldShow()) {
       setTimeout(() => Onboarding.start(), 800);
+    }
+    // Initialize dark mode
+    if (typeof DarkMode !== 'undefined') DarkMode.init();
+    // Initialize keyboard shortcuts help
+    if (typeof ShortcutsHelp !== 'undefined') ShortcutsHelp.init();
+    // Initialize quick actions toolbar
+    if (typeof QuickActions !== 'undefined') QuickActions.init();
+    // Initialize trend chart auto-snapshots
+    if (typeof TrendCharts !== 'undefined') TrendCharts.init();
+    // Show setup wizard for first-time users
+    if (typeof SetupWizard !== 'undefined' && SetupWizard.shouldShow()) {
+      setTimeout(() => SetupWizard.show(), 500);
     }
   },
 
