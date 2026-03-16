@@ -219,11 +219,12 @@ const Router = {
 
   render404(page) {
     const main = document.getElementById('mainContent');
+    const safePage = typeof Sanitizer !== 'undefined' ? Sanitizer.text(page) : page.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     main.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">?</div>
         <h3 class="empty-state-title">Page Not Found</h3>
-        <p class="empty-state-text">The page "${page}" doesn't exist. Navigate using the sidebar.</p>
+        <p class="empty-state-text">The page "${safePage}" doesn't exist. Navigate using the sidebar.</p>
         <button class="btn btn-primary" onclick="Router.navigate('dashboard')">Go to Dashboard</button>
       </div>
     `;

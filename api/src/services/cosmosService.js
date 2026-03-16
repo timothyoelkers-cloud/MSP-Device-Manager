@@ -19,6 +19,15 @@ const CONTAINERS = [
     partitionKey: '/customerId',
     defaultTtl: 60 * 60 * 24 * 90, // 90 days
   },
+  {
+    id: 'consents',
+    partitionKey: '/customerId',
+  },
+  {
+    id: 'securityAlerts',
+    partitionKey: '/customerId',
+    defaultTtl: 60 * 60 * 24 * 180, // 180 days
+  },
 ];
 
 // Maximum number of retries for transient Cosmos errors

@@ -1,4 +1,5 @@
 const { requireAuth } = require('../middleware/auth');
+const { validateTenantId, validateGraphPath } = require('../middleware/validation');
 const cosmos = require('../services/cosmosService');
 const { ConfidentialClientApplication } = require('@azure/msal-node');
 const crypto = require('crypto');
@@ -135,6 +136,22 @@ const graphProxy = requireAuth(async (request, context) => {
             return {
                 status: 400,
                 jsonBody: { error: 'Bad Request', message: 'tenantId is required' },
+            };
+        }
+
+        // Validate tenantId format (GUID)
+        if (!validateTenantId(tenantId)) {
+            return {
+                status: 400,
+                jsonBody: { error: 'Bad Request', message: 'Invalid tenantId format — expected a GUID' },
+            };
+        }
+
+        // Validate Graph API path against allowlist
+        if (!validateGraphPath(`/${restOfPath}`)) {
+            return {
+                status: 403,
+                jsonBody: { error: 'Forbidden', message: 'This Graph API path is not allowed through the proxy' },
             };
         }
 

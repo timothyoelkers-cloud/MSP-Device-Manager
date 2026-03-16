@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="MSP Device Manager — Microsoft 365 Multi-Tenant Device Management for Managed Service Providers">
   <meta name="author" content="Timothy Oelkers">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; connect-src 'self' graph.microsoft.com login.microsoftonline.com *.sharepoint.com; img-src 'self' data: blob:; frame-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; connect-src 'self' graph.microsoft.com login.microsoftonline.com *.sharepoint.com *.azurewebsites.net *.azurestaticapps.net; img-src 'self' data: blob:; frame-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;">
   <title>MSP Device Manager — M365 Multi-Tenant Device Management</title>
 
   <!-- PWA Manifest -->
@@ -760,6 +760,7 @@
   <!-- ============================================================
        JAVASCRIPT MODULES
        ============================================================ -->
+  <script src="js/sanitizer.js"></script>
   <script src="js/errorhandler.js"></script>
   <script src="js/state.js"></script>
   <script src="js/confirm.js"></script>

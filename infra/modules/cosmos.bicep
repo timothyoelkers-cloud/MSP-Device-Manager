@@ -190,6 +190,69 @@ resource auditLogContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/c
   }
 }
 
+resource consentsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-04-15' = {
+  parent: database
+  name: 'consents'
+  properties: {
+    resource: {
+      id: 'consents'
+      partitionKey: {
+        paths: [
+          '/customerId'
+        ]
+        kind: 'Hash'
+        version: 2
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+        excludedPaths: [
+          {
+            path: '/"_etag"/?'
+          }
+        ]
+      }
+    }
+  }
+}
+
+resource securityAlertsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-04-15' = {
+  parent: database
+  name: 'securityAlerts'
+  properties: {
+    resource: {
+      id: 'securityAlerts'
+      partitionKey: {
+        paths: [
+          '/customerId'
+        ]
+        kind: 'Hash'
+        version: 2
+      }
+      defaultTtl: 15552000 // 180 days
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+        excludedPaths: [
+          {
+            path: '/"_etag"/?'
+          }
+        ]
+      }
+    }
+  }
+}
+
 // ── Outputs ─────────────────────────────────────────────────────────────────
 
 output connectionString string = cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString

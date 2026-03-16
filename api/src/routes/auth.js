@@ -148,9 +148,15 @@ async function callback(request, context) {
             token: sessionToken,
             expiresAt,
             createdAt: new Date().toISOString(),
+            lastActivityAt: new Date().toISOString(),
             userAgent: request.headers.get('user-agent') || '',
+            ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
         };
         await sessionsContainer.items.create(session);
+
+        // Enforce concurrent session limit (max 3)
+        const { enforceConcurrentSessions } = require('../middleware/session');
+        await enforceConcurrentSessions(customer.id, 3);
 
         // Audit log
         await logAudit(customer.id, 'LOGIN', {
