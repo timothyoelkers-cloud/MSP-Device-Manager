@@ -60,6 +60,10 @@ const Reports = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
               </button>
+              <button class="btn btn-secondary btn-sm" onclick="Reports.exportPDF()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Export PDF
+              </button>
               <button class="btn btn-primary btn-sm" onclick="Reports.printReport()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 Print
@@ -314,15 +318,62 @@ const Reports = {
     Toast.show('Report exported', 'success');
   },
 
-  printReport() {
+  _getReportHTML(forPDF) {
     const content = document.getElementById('reportContent');
-    if (!content) return;
+    if (!content) return null;
+    const reportName = this.reportTypes.find(r => r.id === this.selectedReport)?.name || this.selectedReport;
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const tenant = AppState.get('activeTenant') === 'all' ? 'All Tenants' : AppState.getTenantName(AppState.get('activeTenant'));
+
+    return `<html><head><title>MSP Report — ${reportName}</title>
+      <style>
+        body { font-family: Inter, -apple-system, sans-serif; padding: 40px; color: #1a1a2e; max-width: 1100px; margin: 0 auto; }
+        .report-header { border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; }
+        .report-header h1 { margin: 0 0 4px; font-size: 22px; color: #2563eb; }
+        .report-meta { color: #666; font-size: 12px; display: flex; gap: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { padding: 8px 12px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+        th { background: #f8fafc; font-weight: 600; color: #475569; }
+        tr:nth-child(even) { background: #fafbfc; }
+        .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+        .stat-card { display: inline-block; padding: 12px 20px; margin: 4px; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .stat-card-value { font-size: 24px; font-weight: 700; color: #2563eb; }
+        .stat-card-label { font-size: 11px; color: #64748b; }
+        ${forPDF ? '@media print { body { padding: 20px; } }' : ''}
+        @page { margin: 1cm; size: A4 landscape; }
+      </style>
+    </head><body>
+      <div class="report-header">
+        <h1>MSP Device Manager</h1>
+        <div style="font-size:16px;font-weight:600;margin:4px 0;">${reportName}</div>
+        <div class="report-meta">
+          <span>Generated: ${date}</span>
+          <span>Tenant: ${tenant}</span>
+        </div>
+      </div>
+      ${content.innerHTML}
+    </body></html>`;
+  },
+
+  printReport() {
+    const html = this._getReportHTML(false);
+    if (!html) return;
     const win = window.open('', '_blank');
-    win.document.write(`<html><head><title>MSP Report — ${this.selectedReport}</title>
-      <style>body{font-family:Inter,sans-serif;padding:20px;color:#333;}table{width:100%;border-collapse:collapse;margin:16px 0;}th,td{padding:8px 12px;border:1px solid #ddd;text-align:left;font-size:13px;}th{background:#f5f5f5;font-weight:600;}.badge{padding:2px 8px;border-radius:4px;font-size:11px;}</style>
-    </head><body><h1>MSP Device Manager — ${this.reportTypes.find(r => r.id === this.selectedReport)?.name}</h1>${content.innerHTML}</body></html>`);
+    win.document.write(html);
     win.document.close();
     win.print();
+  },
+
+  exportPDF() {
+    const html = this._getReportHTML(true);
+    if (!html) return;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    // Auto-trigger print dialog for Save as PDF
+    win.onload = () => win.print();
+    Toast.show('Use "Save as PDF" in the print dialog to export', 'info');
+    AuditLog.log('Export PDF', `Exported "${this.selectedReport}" report as PDF`);
   },
 
   /* ---- Scheduled Reports ---- */

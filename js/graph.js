@@ -701,6 +701,61 @@ const Graph = {
     await this.call(tenantId, `/groups/${groupId}/members/${userId}/$ref`, { method: 'DELETE' });
   },
 
+  // --- Group CRUD ---
+  async createGroup(tenantId, payload) {
+    return await this.call(tenantId, '/groups', { method: 'POST', body: payload });
+  },
+
+  async updateGroup(tenantId, groupId, payload) {
+    await this.call(tenantId, `/groups/${groupId}`, { method: 'PATCH', body: payload });
+  },
+
+  async deleteGroup(tenantId, groupId) {
+    await this.call(tenantId, `/groups/${groupId}`, { method: 'DELETE' });
+  },
+
+  async getGroupMembers(tenantId, groupId) {
+    return await this.callPaged(tenantId, `/groups/${groupId}/members?$select=id,displayName,userPrincipalName,mail,userType`);
+  },
+
+  async addGroupMember(tenantId, groupId, memberId) {
+    await this.call(tenantId, `/groups/${groupId}/members/$ref`, {
+      method: 'POST',
+      body: { '@odata.id': `https://graph.microsoft.com/v1.0/directoryObjects/${memberId}` }
+    });
+  },
+
+  // --- Autopilot Profiles ---
+  async getAutopilotProfiles(tenantId) {
+    return await this.callPaged(tenantId, '/deviceManagement/windowsAutopilotDeploymentProfiles?$select=id,displayName,description,language,extractHardwareHash,outOfBoxExperienceSettings,enrollmentStatusScreenSettings');
+  },
+
+  async createAutopilotProfile(tenantId, payload) {
+    return await this.call(tenantId, '/deviceManagement/windowsAutopilotDeploymentProfiles', { method: 'POST', body: payload });
+  },
+
+  async deleteAutopilotProfile(tenantId, profileId) {
+    await this.call(tenantId, `/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}`, { method: 'DELETE' });
+  },
+
+  async assignAutopilotProfile(tenantId, profileId, groupIds) {
+    const assignments = groupIds.map(gid => ({
+      target: { '@odata.type': '#microsoft.graph.groupAssignmentTarget', groupId: gid }
+    }));
+    await this.call(tenantId, `/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}/assignments`, {
+      method: 'POST', body: { deviceManagementAutopilotPolicyAssignment: assignments }
+    });
+  },
+
+  // --- Directory Audit Logs ---
+  async getDirectoryAuditLogs(tenantId, top = 50) {
+    return await this.call(tenantId, `/auditLogs/directoryAudits?$top=${top}&$orderby=activityDateTime desc`);
+  },
+
+  async getSignInLogs(tenantId, top = 50) {
+    return await this.call(tenantId, `/auditLogs/signIns?$top=${top}&$orderby=createdDateTime desc`);
+  },
+
   async removeUserFromAllGroups(tenantId, userId) {
     const groups = await this.getUserGroups(tenantId, userId);
     const removable = (groups || []).filter(g => g['@odata.type'] === '#microsoft.graph.group');

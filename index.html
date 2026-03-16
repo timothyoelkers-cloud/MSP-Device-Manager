@@ -62,6 +62,21 @@
 
       <div class="topbar-spacer"></div>
 
+      <!-- Global Search -->
+      <div class="topbar-search" id="globalSearchWrapper" style="position:relative;margin-right:12px;">
+        <div style="display:flex;align-items:center;background:var(--gray-50);border:1px solid var(--border);border-radius:8px;padding:0 10px;gap:6px;height:34px;min-width:220px;max-width:320px;transition:all 0.2s;" id="globalSearchBox">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-tertiary)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="globalSearchInput" placeholder="Search devices, users, groups..."
+                 style="border:none;background:transparent;outline:none;font-size:13px;font-family:inherit;color:var(--ink);width:100%;"
+                 oninput="GlobalSearch.search(this.value)"
+                 onfocus="document.getElementById('globalSearchBox').style.borderColor='var(--primary)';document.getElementById('globalSearchBox').style.background='var(--surface)';"
+                 onblur="setTimeout(()=>{document.getElementById('globalSearchBox').style.borderColor='var(--border)';document.getElementById('globalSearchBox').style.background='var(--gray-50)';GlobalSearch.hideResults();},200)"
+                 onkeydown="GlobalSearch.handleKey(event)">
+          <kbd style="font-size:10px;padding:2px 5px;border:1px solid var(--border);border-radius:4px;color:var(--ink-tertiary);background:var(--surface);white-space:nowrap;">Ctrl+K</kbd>
+        </div>
+        <div id="globalSearchResults" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.12);max-height:400px;overflow-y:auto;z-index:9999;"></div>
+      </div>
+
       <div class="topbar-actions">
         <!-- Tenant Selector -->
         <div class="topbar-tenant-selector" id="tenantSelectorBtn" onclick="Tenants.showSelector()">
@@ -702,6 +717,7 @@
   <script src="js/sponsor.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/shortcuts.js"></script>
+  <script src="js/globalsearch.js"></script>
 
   <!-- Gate Script -->
   <script>
