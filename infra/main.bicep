@@ -1,5 +1,6 @@
 // MSP Device Manager — Main Infrastructure Template
-// Deploys all Azure resources for the backend
+// Deploys all Azure resources: VNet, Cosmos DB, Key Vault, Redis, Service Bus,
+// Function App, Static Web App, Front Door + WAF
 
 targetScope = 'resourceGroup'
 
@@ -29,17 +30,36 @@ param azureClientSecret string
 @description('Optional custom domain for Static Web App')
 param customDomain string = ''
 
+@description('Enable VNet isolation with private endpoints')
+param enableVnet bool = true
+
+@description('Redis SKU')
+@allowed(['Basic', 'Standard', 'Premium'])
+param redisSku string = 'Standard'
+
+@description('Service Bus SKU')
+@allowed(['Basic', 'Standard', 'Premium'])
+param serviceBusSku string = 'Standard'
+
 // ── Variables ───────────────────────────────────────────────────────────────
 
 var resourcePrefix = '${appName}-${environmentName}'
 var cosmosDbName = 'mspdevicemanager'
-// Pre-compute Key Vault name to break circular dependency
-// (Function App needs KV URL; Key Vault needs Function App principal ID)
 var kvNameRaw = replace('${resourcePrefix}-kv', '--', '-')
 var kvName = length(kvNameRaw) > 24 ? substring(kvNameRaw, 0, 24) : kvNameRaw
 var keyVaultUrl = 'https://${kvName}${environment().suffixes.keyvaultDns}/'
 
-// ── Modules ─────────────────────────────────────────────────────────────────
+// ── Network ─────────────────────────────────────────────────────────────────
+
+module vnet 'modules/vnet.bicep' = if (enableVnet) {
+  name: '${resourcePrefix}-vnet'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+  }
+}
+
+// ── Data Layer ──────────────────────────────────────────────────────────────
 
 module cosmos 'modules/cosmos.bicep' = {
   name: '${resourcePrefix}-cosmos'
@@ -50,6 +70,32 @@ module cosmos 'modules/cosmos.bicep' = {
   }
 }
 
+module redis 'modules/redis.bicep' = {
+  name: '${resourcePrefix}-redis'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    skuName: redisSku
+    privateEndpointSubnetId: enableVnet ? vnet.outputs.privateEndpointSubnetId : ''
+    redisDnsZoneId: enableVnet ? vnet.outputs.redisDnsZoneId : ''
+  }
+}
+
+// ── Messaging ───────────────────────────────────────────────────────────────
+
+module serviceBus 'modules/serviceBus.bicep' = {
+  name: '${resourcePrefix}-sb'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    skuName: serviceBusSku
+    privateEndpointSubnetId: enableVnet ? vnet.outputs.privateEndpointSubnetId : ''
+    serviceBusDnsZoneId: enableVnet ? vnet.outputs.serviceBusDnsZoneId : ''
+  }
+}
+
+// ── Frontend ────────────────────────────────────────────────────────────────
+
 module staticWebApp 'modules/staticWebApp.bicep' = {
   name: '${resourcePrefix}-swa'
   params: {
@@ -58,6 +104,8 @@ module staticWebApp 'modules/staticWebApp.bicep' = {
     customDomain: customDomain
   }
 }
+
+// ── Backend ─────────────────────────────────────────────────────────────────
 
 module functionApp 'modules/functionApp.bicep' = {
   name: '${resourcePrefix}-func'
@@ -73,6 +121,8 @@ module functionApp 'modules/functionApp.bicep' = {
   }
 }
 
+// ── Secrets ─────────────────────────────────────────────────────────────────
+
 module keyVault 'modules/keyVault.bicep' = {
   name: '${resourcePrefix}-kv'
   params: {
@@ -82,9 +132,25 @@ module keyVault 'modules/keyVault.bicep' = {
   }
 }
 
+// ── Edge / CDN / WAF ────────────────────────────────────────────────────────
+
+module frontDoor 'modules/frontDoor.bicep' = {
+  name: '${resourcePrefix}-fd'
+  params: {
+    resourcePrefix: resourcePrefix
+    functionAppHostname: replace(replace(functionApp.outputs.functionAppUrl, 'https://', ''), '/', '')
+    staticWebAppHostname: replace(replace(staticWebApp.outputs.staticWebAppUrl, 'https://', ''), '/', '')
+    customDomain: customDomain
+  }
+}
+
 // ── Outputs ─────────────────────────────────────────────────────────────────
 
 output functionAppUrl string = functionApp.outputs.functionAppUrl
 output staticWebAppUrl string = staticWebApp.outputs.staticWebAppUrl
+output frontDoorEndpoint string = frontDoor.outputs.frontDoorEndpoint
 output cosmosEndpoint string = cosmos.outputs.endpoint
 output keyVaultUri string = keyVault.outputs.vaultUri
+output redisHostName string = redis.outputs.redisHostName
+output serviceBusNamespace string = serviceBus.outputs.serviceBusNamespace
+output vnetId string = enableVnet ? vnet.outputs.vnetId : 'disabled'
