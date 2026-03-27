@@ -17,7 +17,7 @@
     "jwks-rsa": "^3.1.0"
   },
   "devDependencies": {
-    "jest": "^29.7.0"
+    "jest": "^30.3.0"
   },
   "engines": {
     "node": ">=18.0.0"
