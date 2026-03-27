@@ -14,7 +14,7 @@
     "@azure/functions": "^4.5.0",
     "@azure/msal-node": "^2.6.0",
     "jsonwebtoken": "^9.0.0",
-    "jwks-rsa": "^3.1.0"
+    "jwks-rsa": "^4.0.1"
   },
   "devDependencies": {
     "jest": "^29.7.0"
